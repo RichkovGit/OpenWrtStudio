@@ -34,6 +34,10 @@ public partial class ForkopServerNode : ObservableObject
     [ObservableProperty] private string _name = "";
     [ObservableProperty] private string _protocol = "VLESS";
     [ObservableProperty] private string _subtitle = "";
+    [ObservableProperty] private string _provider = "";
+    [ObservableProperty] private string _serverAddress = "";
+    [ObservableProperty] private int _serverPort;
+    [ObservableProperty] private string _groupTag = "";
     [ObservableProperty] private int? _latencyMs;
     [ObservableProperty] private bool _isActive;
     [ObservableProperty] private bool _isAutoGroup;

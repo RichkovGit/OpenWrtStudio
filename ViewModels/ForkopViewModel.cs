@@ -20,9 +20,71 @@ public partial class ForkopViewModel : ObservableObject
     [ObservableProperty] private ForkopDashboardStats _dashboardStats = new();
     [ObservableProperty] private ObservableCollection<ForkopSubscriptionInfo> _subscriptions = new();
     [ObservableProperty] private ObservableCollection<ForkopServerNode> _servers = new();
+    [ObservableProperty] private ObservableCollection<ForkopServerNode> _autoGroups = new();
+    [ObservableProperty] private ObservableCollection<ForkopServerNode> _filteredServers = new();
     [ObservableProperty] private ForkopServerNode? _selectedServer;
     [ObservableProperty] private bool _isTestingLatency;
     [ObservableProperty] private bool _isUpdatingSubscriptions;
+
+    // Search and Filters
+    [ObservableProperty] private string _serverSearchQuery = "";
+    [ObservableProperty] private string _selectedProviderFilter = "Все";
+    [ObservableProperty] private string _selectedProtocolFilter = "Все";
+    [ObservableProperty] private string _serverStatsText = "Всего серверов: 0";
+
+    public ObservableCollection<string> AvailableProviders { get; } = new()
+    {
+        "Все", "Blanc", "Stealth", "Abuz", "Vless4U", "Прочие"
+    };
+
+    public ObservableCollection<string> AvailableProtocols { get; } = new()
+    {
+        "Все", "VLESS", "Hysteria2", "VMess", "Shadowsocks"
+    };
+
+    partial void OnServerSearchQueryChanged(string value) => ApplyServerFilter();
+    partial void OnSelectedProviderFilterChanged(string value) => ApplyServerFilter();
+    partial void OnSelectedProtocolFilterChanged(string value) => ApplyServerFilter();
+
+    [RelayCommand]
+    public void SetProviderFilter(string? provider)
+    {
+        SelectedProviderFilter = provider ?? "Все";
+    }
+
+    public void ApplyServerFilter()
+    {
+        var regularNodes = Servers.Where(s => !s.IsAutoGroup).AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(SelectedProviderFilter) && SelectedProviderFilter != "Все")
+        {
+            regularNodes = regularNodes.Where(s => 
+                s.Provider.Equals(SelectedProviderFilter, StringComparison.OrdinalIgnoreCase) ||
+                s.Name.StartsWith(SelectedProviderFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(SelectedProtocolFilter) && SelectedProtocolFilter != "Все")
+        {
+            regularNodes = regularNodes.Where(s => 
+                s.Protocol.Equals(SelectedProtocolFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(ServerSearchQuery))
+        {
+            var q = ServerSearchQuery.Trim();
+            regularNodes = regularNodes.Where(s => 
+                s.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                s.Subtitle.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                s.Protocol.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                s.ServerAddress.Contains(q, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var list = regularNodes.ToList();
+        FilteredServers = new ObservableCollection<ForkopServerNode>(list);
+
+        var totalRegular = Servers.Count(s => !s.IsAutoGroup);
+        ServerStatsText = $"Всего серверов: {totalRegular} | Отображается: {FilteredServers.Count}";
+    }
 
     // Section: VPN Proxy
     [ObservableProperty] private ForkopSection _section = new();
@@ -82,6 +144,8 @@ public partial class ForkopViewModel : ObservableObject
             // 3. Servers & Nodes
             var nodes = await _forkopService.GetServersAsync();
             Servers = new ObservableCollection<ForkopServerNode>(nodes);
+            AutoGroups = new ObservableCollection<ForkopServerNode>(nodes.Where(n => n.IsAutoGroup));
+            ApplyServerFilter();
             SelectedServer = nodes.FirstOrDefault(n => n.IsActive) ?? nodes.FirstOrDefault();
 
             // 4. Section Config
@@ -92,7 +156,7 @@ public partial class ForkopViewModel : ObservableObject
             var comps = await _forkopService.GetComponentsAsync();
             Components = new ObservableCollection<ForkopComponentItem>(comps);
 
-            StatusMessage = $"ForkOP загружен. Активных соединений: {DashboardStats.ActiveConnections}, Серверов: {Servers.Count}.";
+            StatusMessage = $"ForkOP загружен. Узлов роутера: {Servers.Count} (Авто-групп: {AutoGroups.Count}, Серверов: {Servers.Count - AutoGroups.Count}).";
         }
         catch (Exception ex)
         {
@@ -117,6 +181,10 @@ public partial class ForkopViewModel : ObservableObject
             {
                 var subs = await _forkopService.GetSubscriptionInfoListAsync();
                 Subscriptions = new ObservableCollection<ForkopSubscriptionInfo>(subs);
+                var nodes = await _forkopService.GetServersAsync();
+                Servers = new ObservableCollection<ForkopServerNode>(nodes);
+                AutoGroups = new ObservableCollection<ForkopServerNode>(nodes.Where(n => n.IsAutoGroup));
+                ApplyServerFilter();
             }
         }
         catch (Exception ex)
@@ -138,6 +206,8 @@ public partial class ForkopViewModel : ObservableObject
         {
             var updated = await _forkopService.TestLatenciesAsync(Servers.ToList());
             Servers = new ObservableCollection<ForkopServerNode>(updated);
+            AutoGroups = new ObservableCollection<ForkopServerNode>(updated.Where(n => n.IsAutoGroup));
+            ApplyServerFilter();
             StatusMessage = "Тестирование задержки завершено успешно.";
         }
         catch (Exception ex)
@@ -157,7 +227,15 @@ public partial class ForkopViewModel : ObservableObject
 
         foreach (var s in Servers)
         {
-            s.IsActive = (s == node);
+            s.IsActive = (s == node || s.Name == node.Name);
+        }
+        foreach (var a in AutoGroups)
+        {
+            a.IsActive = (a == node || a.Name == node.Name);
+        }
+        foreach (var f in FilteredServers)
+        {
+            f.IsActive = (f == node || f.Name == node.Name);
         }
         SelectedServer = node;
 

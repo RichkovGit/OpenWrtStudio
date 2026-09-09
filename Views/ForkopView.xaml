@@ -196,9 +196,9 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <!-- Server & Group Cards Grid -->
-                <TextBlock Text="Серверы и Авто-группы" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
-                <ItemsControl ItemsSource="{Binding Servers}">
+                <!-- Auto-Groups and Priority Section -->
+                <TextBlock Text="Авто-группы и Отказоустойчивость" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+                <ItemsControl ItemsSource="{Binding AutoGroups}" Margin="0,0,0,20">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <UniformGrid Columns="4" />
@@ -265,6 +265,102 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+
+                <!-- All Individual Servers Section -->
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Все серверы и узлы роутера" FontSize="18" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding ServerStatsText}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Провайдер: " VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,6,0" />
+                        <ui:Button Appearance="Secondary" Content="Все" Command="{Binding SetProviderFilterCommand}" CommandParameter="Все" Padding="8,3" FontSize="11" Margin="0,0,4,0" />
+                        <ui:Button Appearance="Secondary" Content="Blanc" Command="{Binding SetProviderFilterCommand}" CommandParameter="Blanc" Padding="8,3" FontSize="11" Margin="0,0,4,0" />
+                        <ui:Button Appearance="Secondary" Content="Stealth" Command="{Binding SetProviderFilterCommand}" CommandParameter="Stealth" Padding="8,3" FontSize="11" Margin="0,0,4,0" />
+                        <ui:Button Appearance="Secondary" Content="Abuz" Command="{Binding SetProviderFilterCommand}" CommandParameter="Abuz" Padding="8,3" FontSize="11" Margin="0,0,4,0" />
+                        <ui:Button Appearance="Secondary" Content="Vless4U" Command="{Binding SetProviderFilterCommand}" CommandParameter="Vless4U" Padding="8,3" FontSize="11" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- Search Input Bar -->
+                <ui:TextBox PlaceholderText="🔍 Поиск сервера по названию, стране (🇳🇱, 🇩🇪, 🇵🇱, 🇺🇸...), IP или порту..." 
+                            Text="{Binding ServerSearchQuery, UpdateSourceTrigger=PropertyChanged}" 
+                            Margin="0,0,0,14" />
+
+                <!-- Server Cards Grid (Scrollable) -->
+                <ScrollViewer MaxHeight="540" VerticalScrollBarVisibility="Auto" Margin="0,0,0,20">
+                    <ItemsControl ItemsSource="{Binding FilteredServers}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="4" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,10,10" CornerRadius="8" Padding="12"
+                                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="BorderThickness" Value="1" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                    <Setter Property="BorderBrush" Value="#10B981" />
+                                                    <Setter Property="BorderThickness" Value="2" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Header: Name & Active Badge -->
+                                        <DockPanel LastChildFill="True">
+                                            <Border DockPanel.Dock="Right" CornerRadius="4" Padding="4,1" Margin="4,0,0,0"
+                                                    Background="#10B981"
+                                                    Visibility="{Binding IsActive, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                <TextBlock Text="АКТИВЕН" FontSize="9" FontWeight="Bold" Foreground="White" />
+                                            </Border>
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis" />
+                                        </DockPanel>
+
+                                        <!-- Subtitle -->
+                                        <TextBlock Grid.Row="1" Text="{Binding Subtitle}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,8" />
+
+                                        <!-- Protocol & Latency -->
+                                        <Grid Grid.Row="3">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}">
+                                                <TextBlock Text="{Binding Protocol}" FontSize="11" FontWeight="Medium" />
+                                            </Border>
+                                            <Border Grid.Column="1" CornerRadius="4" Padding="6,2" Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}">
+                                                <TextBlock Text="{Binding LatencyDisplay}" FontSize="11" FontWeight="Bold" Foreground="#10B981" />
+                                            </Border>
+                                        </Grid>
+
+                                        <!-- Invisible button over card to select -->
+                                        <Button Grid.RowSpan="4" Opacity="0"
+                                                Command="{Binding DataContext.SelectServerCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Cursor="Hand" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
             </StackPanel>
 
             <!-- ================= TAB 1: СЕКЦИЯ VPN ПРОКСИ ================= -->
@@ -442,70 +538,94 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="Список серверов и цепочек обхода" FontSize="18" FontWeight="SemiBold" />
-                                <TextBlock Text="Выберите активный сервер или группу URLTest/Priority для маршрутизации трафика" 
-                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                <TextBlock Text="{Binding ServerStatsText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
                             </StackPanel>
                             <ui:Button Grid.Column="1" Appearance="Primary" Icon="{ui:SymbolIcon Flash24}" Content="Замерить задержку всех узлов" 
                                        Command="{Binding TestLatencyCommand}" />
                         </Grid>
 
-                        <ItemsControl ItemsSource="{Binding Servers}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" 
-                                            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" 
-                                            BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,8">
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                                        <Setter Property="BorderBrush" Value="#10B981" />
-                                                        <Setter Property="BorderThickness" Value="2" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="260" />
-                                                <ColumnDefinition Width="130" />
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="100" />
-                                                <ColumnDefinition Width="140" />
-                                            </Grid.ColumnDefinitions>
+                        <!-- Filter and Search Bar -->
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox PlaceholderText="🔍 Поиск по названию, стране (🇳🇱, 🇩🇪, 🇵🇱, 🇺🇸...), IP или порту..." 
+                                        Text="{Binding ServerSearchQuery, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,10,0" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <ui:Button Appearance="Secondary" Content="Все" Command="{Binding SetProviderFilterCommand}" CommandParameter="Все" Padding="10,4" Margin="0,0,4,0" />
+                                <ui:Button Appearance="Secondary" Content="Blanc" Command="{Binding SetProviderFilterCommand}" CommandParameter="Blanc" Padding="10,4" Margin="0,0,4,0" />
+                                <ui:Button Appearance="Secondary" Content="Stealth" Command="{Binding SetProviderFilterCommand}" CommandParameter="Stealth" Padding="10,4" Margin="0,0,4,0" />
+                                <ui:Button Appearance="Secondary" Content="Abuz" Command="{Binding SetProviderFilterCommand}" CommandParameter="Abuz" Padding="10,4" Margin="0,0,4,0" />
+                                <ui:Button Appearance="Secondary" Content="Vless4U" Command="{Binding SetProviderFilterCommand}" CommandParameter="Vless4U" Padding="10,4" />
+                            </StackPanel>
+                        </Grid>
 
-                                            <StackPanel VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" />
-                                                <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                            </StackPanel>
+                        <ScrollViewer MaxHeight="600" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding FilteredServers}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" 
+                                                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" 
+                                                BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,8">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                            <Setter Property="BorderBrush" Value="#10B981" />
+                                                            <Setter Property="BorderThickness" Value="2" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="110" />
+                                                    <ColumnDefinition Width="90" />
+                                                    <ColumnDefinition Width="100" />
+                                                    <ColumnDefinition Width="90" />
+                                                    <ColumnDefinition Width="140" />
+                                                </Grid.ColumnDefinitions>
 
-                                            <Border Grid.Column="1" CornerRadius="4" Padding="8,2" HorizontalAlignment="Left" VerticalAlignment="Center"
-                                                    Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}">
-                                                <TextBlock Text="{Binding Protocol}" FontSize="11" FontWeight="Medium" />
-                                            </Border>
+                                                <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                </StackPanel>
 
-                                            <Border Grid.Column="2" VerticalAlignment="Center">
-                                                <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Left"
-                                                        Background="{Binding IsActive, Converter={StaticResource BoolToStatusBrushConverter}}">
-                                                    <TextBlock Text="{Binding IsActive, Converter={StaticResource BoolToStatusTextConverter}, ConverterParameter='АКТИВЕН|В РЕЗЕРВЕ'}" 
-                                                               FontSize="10" FontWeight="Bold" Foreground="White" />
+                                                <Border Grid.Column="1" CornerRadius="4" Padding="8,2" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                        Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}">
+                                                    <TextBlock Text="{Binding Protocol}" FontSize="11" FontWeight="Medium" />
                                                 </Border>
-                                            </Border>
 
-                                            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-                                                <ui:SymbolIcon Symbol="Flash24" FontSize="12" Foreground="#10B981" Margin="0,0,4,0" />
-                                                <TextBlock Text="{Binding LatencyDisplay}" FontWeight="Bold" FontSize="13" Foreground="#10B981" />
-                                            </StackPanel>
+                                                <Border Grid.Column="2" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                        Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}">
+                                                    <TextBlock Text="{Binding Provider}" FontSize="10" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                </Border>
 
-                                            <ui:Button Grid.Column="4" Appearance="Secondary" Content="Сделать активным" 
-                                                       Command="{Binding DataContext.SelectServerCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                       CommandParameter="{Binding}"
-                                                       Visibility="{Binding IsActive, Converter={StaticResource InverseBooleanConverter}}" />
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                                                <Border Grid.Column="3" VerticalAlignment="Center">
+                                                    <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Left"
+                                                            Background="{Binding IsActive, Converter={StaticResource BoolToStatusBrushConverter}}">
+                                                        <TextBlock Text="{Binding IsActive, Converter={StaticResource BoolToStatusTextConverter}, ConverterParameter='АКТИВЕН|В РЕЗЕРВЕ'}" 
+                                                                   FontSize="10" FontWeight="Bold" Foreground="White" />
+                                                    </Border>
+                                                </Border>
+
+                                                <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <ui:SymbolIcon Symbol="Flash24" FontSize="12" Foreground="#10B981" Margin="0,0,4,0" />
+                                                    <TextBlock Text="{Binding LatencyDisplay}" FontWeight="Bold" FontSize="12" Foreground="#10B981" />
+                                                </StackPanel>
+
+                                                <ui:Button Grid.Column="5" Appearance="Secondary" Content="Сделать активным" 
+                                                           Command="{Binding DataContext.SelectServerCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                           CommandParameter="{Binding}"
+                                                           Visibility="{Binding IsActive, Converter={StaticResource InverseBooleanConverter}}" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
                     </StackPanel>
                 </ui:Card>
             </StackPanel>
