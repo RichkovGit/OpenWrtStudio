@@ -43,6 +43,7 @@ public partial class App : Application
         services.AddSingleton<IBackgroundMonitorService, BackgroundMonitorService>();
         services.AddSingleton<ISystemTrayManager, SystemTrayManager>();
         services.AddSingleton<IUpdateService, UpdateService>();
+        services.AddSingleton<IThemeService, ThemeService>();
 
         // ViewModels
         services.AddSingleton<DashboardViewModel>();
@@ -66,7 +67,9 @@ public partial class App : Application
 
         try
         {
-            ApplicationThemeManager.Apply(ApplicationTheme.Dark);
+            var themeService = _serviceProvider.GetRequiredService<IThemeService>();
+            var (savedThemeId, isDark) = themeService.LoadSavedPreferences();
+            themeService.ApplyTheme(savedThemeId, isDark);
 
             var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
             var mainViewModel = _serviceProvider.GetRequiredService<MainViewModel>();

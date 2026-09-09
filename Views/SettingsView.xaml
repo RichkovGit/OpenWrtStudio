@@ -117,21 +117,73 @@
 
             <!-- Appearance & Theme Card -->
             <ui:Card Margin="0,0,0,16">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
 
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Тема оформления интерфейса" FontSize="16" FontWeight="SemiBold" />
-                        <TextBlock Text="Переключение между светлой и тёмной темой Windows Fluent Design" 
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,0" />
-                    </StackPanel>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Персонализация и Цветовые Схемы" FontSize="16" FontWeight="SemiBold" />
+                            <TextBlock Text="Выберите акцентную палитру и режим отображения интерфейса (Fluent Design)" 
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,0" />
+                        </StackPanel>
 
-                    <ui:Button Grid.Column="1" Appearance="Secondary" Icon="{ui:SymbolIcon DarkTheme24}" 
-                               Content="Сменить тему" Command="{Binding ToggleThemeCommand}" />
-                </Grid>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:ToggleSwitch Content="Тёмная тема" IsChecked="{Binding IsDarkMode}" 
+                                             Command="{Binding ToggleThemeCommand}" Margin="0,0,12,0" />
+                            <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon DarkTheme24}" 
+                                       Content="Сменить режим" Command="{Binding ToggleThemeCommand}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Color Palettes Grid -->
+                    <TextBlock Text="Акцентные цветовые палитры:" FontWeight="Medium" Margin="0,4,0,8" />
+                    <ItemsControl ItemsSource="{Binding ColorThemes}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="3" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="4" CornerRadius="8" Padding="10" 
+                                        BorderThickness="{Binding IsSelected, Converter={StaticResource BoolToThicknessConverter}, FallbackValue=1}"
+                                        BorderBrush="{Binding Brush}"
+                                        Background="{DynamicResource ControlFillColorDefaultBrush}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Swatch circle -->
+                                        <Ellipse Width="24" Height="24" Fill="{Binding Brush}" Margin="0,0,10,0" VerticalAlignment="Center" />
+
+                                        <!-- Text info -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
+                                            <TextBlock Text="{Binding Description}" FontSize="11" 
+                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+
+                                        <!-- Select Button -->
+                                        <Button Grid.Column="2" Padding="8,4" Margin="6,0,0,0"
+                                                Content="{Binding IsSelected, Converter={StaticResource BoolToSelectedTextConverter}, FallbackValue='Выбрать'}"
+                                                Command="{Binding DataContext.SelectColorThemeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Text="{Binding ThemeStatusText}" Margin="0,8,0,0"
+                               Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" FontWeight="Medium"
+                               Visibility="{Binding ThemeStatusText, Converter={StaticResource StringToVisibilityConverter}, FallbackValue=Collapsed}" />
+                </StackPanel>
             </ui:Card>
 
             <!-- Card 3: OTA Updates (GitHub Releases) -->
@@ -163,7 +215,7 @@
                     </Grid>
 
                     <!-- Status / Progress row -->
-                    <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" CornerRadius="6" Padding="12,10" Margin="0,4,0,0">
+                    <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" CornerRadius="6" Padding="14,12" Margin="0,4,0,0">
                         <StackPanel>
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -172,7 +224,7 @@
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <ui:ProgressRing Width="16" Height="16" IsIndeterminate="True" Margin="0,0,10,0"
+                                    <ui:ProgressRing Width="18" Height="18" IsIndeterminate="True" Margin="0,0,10,0"
                                                      Visibility="{Binding IsCheckingUpdate, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                     <TextBlock Text="{Binding UpdateStatusText}" FontWeight="Medium" VerticalAlignment="Center" />
                                 </StackPanel>
@@ -182,12 +234,27 @@
                                            Visibility="{Binding UpdateInfo.IsUpdateAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" />
                             </Grid>
 
+                            <!-- Changelog display when update found -->
+                            <StackPanel Margin="0,12,0,0" Visibility="{Binding UpdateInfo.IsUpdateAvailable, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Border Background="{DynamicResource ControlFillColorDefaultBrush}" CornerRadius="6" Padding="12" BorderThickness="1" BorderBrush="{DynamicResource AccentFillColorDefaultBrush}">
+                                    <StackPanel>
+                                        <TextBlock Text="Что нового в этой версии:" FontWeight="SemiBold" Margin="0,0,0,6" />
+                                        <TextBlock Text="{Binding UpdateInfo.Changelog}" TextWrapping="Wrap" MaxHeight="120"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
                             <!-- Download Progress bar -->
                             <StackPanel Margin="0,10,0,0" Visibility="{Binding IsDownloadingUpdate, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <ProgressBar Value="{Binding DownloadProgress}" Maximum="100" Height="8" />
-                                <TextBlock Text="{Binding DownloadProgress, StringFormat='Загрузка: {0}%'}" FontSize="11" 
+                                <TextBlock Text="{Binding DownloadProgress, StringFormat='Загрузка обновления: {0}%'}" FontSize="11" 
                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Right" Margin="0,4,0,0" />
                             </StackPanel>
+
+                            <!-- Auto check switch -->
+                            <ui:ToggleSwitch Content="Проверять обновления автоматически при запуске OpenWrt Studio" 
+                                             IsChecked="{Binding AutoCheckUpdates}" Margin="0,10,0,0" />
                         </StackPanel>
                     </Border>
                 </StackPanel>

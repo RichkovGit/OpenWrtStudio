@@ -1,6 +1,6 @@
 ; Script generated for OpenWrt Studio Installer
 #define MyAppName "OpenWrt Studio"
-#define MyAppVersion "2.5.0"
+#define MyAppVersion "2.5.1"
 #define MyAppPublisher "RichkovGit"
 #define MyAppURL "https://github.com/RichkovGit/OpenWrtStudio"
 #define MyAppExeName "OpenWrtStudio.exe"
@@ -19,7 +19,7 @@ DisableProgramGroupPage=yes
 LicenseFile=
 PrivilegesRequired=lowest
 OutputDir=..\installer_output
-OutputBaseFilename=OpenWrtStudio_Setup_v2.5
+OutputBaseFilename=OpenWrtStudio_Setup_v2.5.1
 SetupIconFile=..\Assets\app.ico
 Compression=lzma2/ultra64
 SolidCompression=yes

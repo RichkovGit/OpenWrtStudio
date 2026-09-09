@@ -16,6 +16,9 @@
             <converters:IndexToVisibilityConverter x:Key="IndexToVisibilityConverter" />
             <converters:BoolToStatusBrushConverter x:Key="BoolToStatusBrushConverter" />
             <converters:BoolToStatusTextConverter x:Key="BoolToStatusTextConverter" />
+            <converters:BoolToThicknessConverter x:Key="BoolToThicknessConverter" />
+            <converters:BoolToSelectedTextConverter x:Key="BoolToSelectedTextConverter" />
+            <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         </ResourceDictionary>
     </Application.Resources>

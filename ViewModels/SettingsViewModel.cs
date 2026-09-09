@@ -17,6 +17,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly ISshService _ssh;
     private readonly IUpdateService _updateService;
     private readonly INotificationService _notifications;
+    private readonly IThemeService _themeService;
 
     [ObservableProperty]
     private ObservableCollection<ConnectionProfile> _profiles = new();
@@ -32,6 +33,15 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isDarkMode = true;
+
+    [ObservableProperty]
+    private ObservableCollection<ColorThemeItem> _colorThemes = new();
+
+    [ObservableProperty]
+    private ColorThemeItem? _selectedColorTheme;
+
+    [ObservableProperty]
+    private string _themeStatusText = "";
 
     // OTA Updates
     [ObservableProperty]
@@ -58,12 +68,14 @@ public partial class SettingsViewModel : ObservableObject
         IProfileService profileService,
         ISshService ssh,
         IUpdateService updateService,
-        INotificationService notifications)
+        INotificationService notifications,
+        IThemeService themeService)
     {
         _profileService = profileService;
         _ssh = ssh;
         _updateService = updateService;
         _notifications = notifications;
+        _themeService = themeService;
     }
 
     public async Task InitializeAsync()
@@ -77,6 +89,15 @@ public partial class SettingsViewModel : ObservableObject
         else
         {
             AddNewProfile();
+        }
+
+        // Initialize theme options
+        ColorThemes = new ObservableCollection<ColorThemeItem>(_themeService.AvailableThemes);
+        SelectedColorTheme = _themeService.CurrentTheme;
+        IsDarkMode = _themeService.IsDarkMode;
+        foreach (var t in ColorThemes)
+        {
+            t.IsSelected = t.Id == SelectedColorTheme?.Id;
         }
 
         if (AutoCheckUpdates)
@@ -149,10 +170,24 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    public void SelectColorTheme(ColorThemeItem? theme)
+    {
+        if (theme == null) return;
+        SelectedColorTheme = theme;
+        foreach (var t in ColorThemes)
+        {
+            t.IsSelected = t.Id == theme.Id;
+        }
+        _themeService.ApplyTheme(theme.Id, IsDarkMode);
+        ThemeStatusText = $"Применена цветовая схема: «{theme.Name}»";
+    }
+
+    [RelayCommand]
     public void ToggleTheme()
     {
         IsDarkMode = !IsDarkMode;
-        ApplicationThemeManager.Apply(IsDarkMode ? ApplicationTheme.Dark : ApplicationTheme.Light);
+        _themeService.ApplyTheme(SelectedColorTheme?.Id ?? "cyan", IsDarkMode);
+        ThemeStatusText = IsDarkMode ? "Активирована тёмная тема" : "Активирована светлая тема";
     }
 
     [RelayCommand]
