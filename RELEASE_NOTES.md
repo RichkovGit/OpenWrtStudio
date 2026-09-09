@@ -78,8 +78,8 @@
 
 ### 🔒 Контрольные суммы (SHA-256):
 ```
-ce468b60a45ce0460bc3a621204fadb1e6ed37f7a0760ac76c988d61e9abc32d  OpenWrtStudio_Setup_v2.5.exe
-78b7a43fc0251c71ebf9fcede1c431ad9156c1bc687c498ec1c6e9c065fc83dd  OpenWrtStudio_v2.5_Portable.zip
+057b2b4e220a2f7ed6730080a0279045ba05deb766c4cdede48778714600721d  OpenWrtStudio_Setup_v2.5.exe
+a9c7ebe4f54916adfc0d5ba968dbbdf4ae3b8aea5a719d17dacbf4177e7cc6ed  OpenWrtStudio_v2.5_Portable.zip
 ```
 
 ---

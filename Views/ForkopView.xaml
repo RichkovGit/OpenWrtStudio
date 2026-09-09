@@ -5,20 +5,49 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              mc:Ignorable="d" 
-             d:DesignHeight="800" d:DesignWidth="950">
+             d:DesignHeight="950" d:DesignWidth="1100">
+    <UserControl.Resources>
+        <Style x:Key="SubTabButtonStyle" TargetType="RadioButton">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="16,8" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}" Margin="0,0,8,0">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.9" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="24">
             <!-- Header -->
-            <StackPanel Margin="0,0,0,20">
+            <StackPanel Margin="0,0,0,16">
                 <TextBlock Text="ForkOP &amp; Обход блокировок" FontSize="26" FontWeight="SemiBold" />
-                <TextBlock Text="Управление репозиториями ForkOP, компонентами PassWall 2, SmartDNS, ChinaDNS-NG и диагностика обхода" 
+                <TextBlock Text="Центр управления ForkOP: живой дашборд, серверы, подписки, правила и диагностика" 
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,0" />
             </StackPanel>
 
             <!-- Status Banner -->
             <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" 
                     BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" 
-                    BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,20">
+                    BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,16">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -29,173 +58,624 @@
                                          Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center" FontWeight="Medium" />
                     </StackPanel>
-                    <ui:Button Grid.Column="1" Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Content="Обновить статус" Command="{Binding LoadDataCommand}" />
+                    <ui:Button Grid.Column="1" Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Content="Обновить" Command="{Binding LoadDataCommand}" />
                 </Grid>
             </Border>
 
-            <!-- Card 1: ForkOP Feed Setup -->
-            <ui:Card Margin="0,0,0,20">
-                <StackPanel>
-                    <Grid Margin="0,0,0,14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="Репозиторий пакетов ForkOP" FontSize="18" FontWeight="SemiBold" />
-                            <TextBlock Text="Предоставляет готовые пакеты PassWall, Sing-box, Xray и DNS-фильтры для вашей архитектуры" 
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
-                        </StackPanel>
-                        <Border Grid.Column="1" CornerRadius="6" Padding="10,4"
-                                Background="{Binding FeedInfo.IsConfigured, Converter={StaticResource BoolToStatusBrushConverter}}">
-                            <TextBlock Text="{Binding FeedInfo.IsConfigured, Converter={StaticResource BoolToStatusTextConverter}, ConverterParameter='Подключен|Не настроен'}" 
-                                       FontWeight="SemiBold" FontSize="12" Foreground="White" />
-                        </Border>
-                    </Grid>
-
-                    <Grid Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Margin="0,0,12,0">
-                            <TextBlock Text="Архитектура процессора роутера" Margin="0,0,0,4" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                            <ui:TextBox Text="{Binding FeedInfo.Architecture, Mode=OneWay}" IsReadOnly="True" />
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="1" Margin="0,0,12,0">
-                            <TextBlock Text="Статус ключа подписи" Margin="0,0,0,4" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                            <ui:TextBox Text="{Binding FeedInfo.FeedKeyStatus, Mode=OneWay}" IsReadOnly="True" />
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="2" VerticalAlignment="Bottom">
-                            <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Add24}" Content="Подключить ForkOP" 
-                                       Command="{Binding ConfigureRepoCommand}" />
-                        </StackPanel>
-                    </Grid>
-
-                    <TextBlock Text="{Binding FeedInfo.FeedUrl, StringFormat='Текущий адрес фида: {0}'}" 
-                               FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+            <!-- Navigation Sub-Tabs -->
+            <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" 
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" 
+                    BorderThickness="1" CornerRadius="8" Padding="6" Margin="0,0,0,20">
+                <StackPanel Orientation="Horizontal">
+                    <RadioButton Content="📊 Дашборд" Style="{StaticResource SubTabButtonStyle}"
+                                 IsChecked="{Binding SelectedTabIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}" />
+                    <RadioButton Content="⚙️ Секция: VPN Прокси" Style="{StaticResource SubTabButtonStyle}"
+                                 IsChecked="{Binding SelectedTabIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=1}" />
+                    <RadioButton Content="🌐 Серверы и Узлы" Style="{StaticResource SubTabButtonStyle}"
+                                 IsChecked="{Binding SelectedTabIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=2}" />
+                    <RadioButton Content="🛠️ Компоненты и Диагностика" Style="{StaticResource SubTabButtonStyle}"
+                                 IsChecked="{Binding SelectedTabIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=3}" />
                 </StackPanel>
-            </ui:Card>
+            </Border>
 
-            <!-- Card 2: Components List -->
-            <ui:Card Margin="0,0,0,20">
-                <StackPanel>
-                    <TextBlock Text="Компоненты и службы обхода блокировок" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
-                    
-                    <ItemsControl ItemsSource="{Binding Components}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" 
-                                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" 
-                                        BorderThickness="1" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
-                                    <Grid>
+            <!-- ================= TAB 0: ДАШБОРД ================= -->
+            <StackPanel Visibility="{Binding SelectedTabIndex, Converter={StaticResource IndexToVisibilityConverter}, ConverterParameter=0}">
+                <!-- Metrics 4-Col Grid -->
+                <Grid Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Metric 1: Traffic Speed -->
+                    <ui:Card Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="Скорость трафика" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                <TextBlock Text="Исходящий: " FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Text="{Binding DashboardStats.OutSpeed}" FontSize="12" FontWeight="SemiBold" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                <TextBlock Text="Входящий: " FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Text="{Binding DashboardStats.InSpeed}" FontSize="12" FontWeight="SemiBold" Foreground="#10B981" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ui:Card>
+
+                    <!-- Metric 2: Total Traffic -->
+                    <ui:Card Grid.Column="1" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="Всего трафика" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                <TextBlock Text="Исходящий: " FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Text="{Binding DashboardStats.TotalOut}" FontSize="12" FontWeight="SemiBold" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                <TextBlock Text="Входящий: " FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Text="{Binding DashboardStats.TotalIn}" FontSize="12" FontWeight="SemiBold" Foreground="#3B82F6" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ui:Card>
+
+                    <!-- Metric 3: System Info -->
+                    <ui:Card Grid.Column="2" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="Системная информация" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                <TextBlock Text="Соединений: " FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Text="{Binding DashboardStats.ActiveConnections}" FontSize="12" FontWeight="SemiBold" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                <TextBlock Text="Память: " FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Text="{Binding DashboardStats.MemoryUsage}" FontSize="12" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ui:Card>
+
+                    <!-- Metric 4: Services Status -->
+                    <ui:Card Grid.Column="3">
+                        <StackPanel>
+                            <TextBlock Text="Информация о сервисах" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                <TextBlock Text="Forkop: " FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Text="✓ Работает" FontSize="12" FontWeight="SemiBold" Foreground="#10B981" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                <TextBlock Text="Sing-box: " FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Text="✓ Работает" FontSize="12" FontWeight="SemiBold" Foreground="#10B981" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ui:Card>
+                </Grid>
+
+                <!-- VPN Proxy Header & Action Buttons -->
+                <Grid Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="VPN Прокси" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon ArrowSync24}" Content="Обновить подписки" 
+                                   Command="{Binding UpdateSubscriptionsCommand}" Margin="0,0,10,0" />
+                        <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon Flash24}" Content="Тестирование задержки" 
+                                   Command="{Binding TestLatencyCommand}" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- Subscriptions Cards -->
+                <ItemsControl ItemsSource="{Binding Subscriptions}" Margin="0,0,0,20">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <ui:Card Margin="0,0,0,10">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,6">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="220" />
                                             <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="140" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-
-                                        <StackPanel VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" />
-                                            <TextBlock Text="{Binding PackageName}" FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Информация о подписке: " FontWeight="Medium" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="14" />
                                         </StackPanel>
-
-                                        <TextBlock Grid.Column="1" Text="{Binding Description}" VerticalAlignment="Center" 
-                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Margin="10,0" />
-
-                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
-                                            <Border CornerRadius="10" Padding="8,2" Margin="0,0,6,0"
-                                                    Background="{Binding IsInstalled, Converter={StaticResource BoolToStatusBrushConverter}}">
-                                                <TextBlock Text="{Binding IsInstalled, Converter={StaticResource BoolToStatusTextConverter}, ConverterParameter='Установлен|Не установлен'}" 
-                                                           FontSize="11" FontWeight="Medium" Foreground="White" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <Border Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,2" Margin="0,0,8,0">
+                                                <TextBlock Text="{Binding TrafficUsed, StringFormat='Трафик: {0}'}" FontSize="11" />
                                             </Border>
-                                            <TextBlock Text="{Binding Version}" FontSize="11" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            <Border Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,2">
+                                                <TextBlock Text="{Binding ExpireDate, StringFormat='Истекает: {0}'}" FontSize="11" />
+                                            </Border>
                                         </StackPanel>
-
-                                        <ui:Button Grid.Column="3" Appearance="Secondary" Content="Установить" 
-                                                   Command="{Binding DataContext.InstallComponentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                   CommandParameter="{Binding}"
-                                                   Visibility="{Binding IsInstalled, Converter={StaticResource InverseBooleanConverter}}" />
                                     </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-            </ui:Card>
-
-            <!-- Card 3: Bypass Diagnostics -->
-            <ui:Card Margin="0,0,0,20">
-                <StackPanel>
-                    <Grid Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="Диагностика обхода блокировок и прозрачного проксирования" FontSize="18" FontWeight="SemiBold" />
-                            <TextBlock Text="Анализ таблиц nftables/iptables в ядре роутера, перехвата порта 53 и доступности ресурсов" 
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
-                        </StackPanel>
-                        <ui:Button Grid.Column="1" Appearance="Primary" Icon="{ui:SymbolIcon Stethoscope24}" Content="Запустить тест" 
-                                   Command="{Binding RunDiagnosticsCommand}" />
-                    </Grid>
-
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Russian Sites -->
-                        <Border Margin="0,0,8,0" Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
-                            <StackPanel>
-                                <TextBlock Text="Прямой трафик (РФ)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                <TextBlock Text="{Binding DiagResult.DirectRussiaOk, Converter={StaticResource BoolToStatusTextConverter}, ConverterParameter='Работает|Сбой'}" 
-                                           FontWeight="Bold" FontSize="16" Margin="0,4,0,0"
-                                           Foreground="{Binding DiagResult.DirectRussiaOk, Converter={StaticResource BoolToStatusBrushConverter}}" />
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Blocked Sites Resolution -->
-                        <Border Grid.Column="1" Margin="0,0,8,0" Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
-                            <StackPanel>
-                                <TextBlock Text="DNS обхода блокировок" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                <TextBlock Text="{Binding DiagResult.ProxyBypassOk, Converter={StaticResource BoolToStatusTextConverter}, ConverterParameter='Разрешается|Блокируется'}" 
-                                           FontWeight="Bold" FontSize="16" Margin="0,4,0,0"
-                                           Foreground="{Binding DiagResult.ProxyBypassOk, Converter={StaticResource BoolToStatusBrushConverter}}" />
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Kernel Rules -->
-                        <Border Grid.Column="2" Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
-                            <StackPanel>
-                                <TextBlock Text="Правила фильтрации в ядре" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                <TextBlock Text="{Binding DiagResult.HasTransparentProxyRules, Converter={StaticResource BoolToStatusTextConverter}, ConverterParameter='Внедрены|Не найдены'}" 
-                                           FontWeight="Bold" FontSize="16" Margin="0,4,0,0"
-                                           Foreground="{Binding DiagResult.HasTransparentProxyRules, Converter={StaticResource BoolToStatusBrushConverter}}" />
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-
-                    <ItemsControl ItemsSource="{Binding DiagResult.RuleChainsFound}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal" Margin="0,2">
-                                    <ui:SymbolIcon Symbol="Checkmark24" Foreground="#10B981" Margin="0,0,8,0" FontSize="14" />
-                                    <TextBlock Text="{Binding}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="{Binding Description}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                 </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-            </ui:Card>
+                            </ui:Card>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Server & Group Cards Grid -->
+                <TextBlock Text="Серверы и Авто-группы" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+                <ItemsControl ItemsSource="{Binding Servers}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="4" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,0,10,10" CornerRadius="8" Padding="12"
+                                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="BorderThickness" Value="1" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                <Setter Property="BorderBrush" Value="#10B981" />
+                                                <Setter Property="BorderThickness" Value="2" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Header: Name & Active Badge -->
+                                    <DockPanel LastChildFill="True">
+                                        <Border DockPanel.Dock="Right" CornerRadius="4" Padding="4,1" Margin="4,0,0,0"
+                                                Background="#10B981"
+                                                Visibility="{Binding IsActive, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <TextBlock Text="АКТИВЕН" FontSize="9" FontWeight="Bold" Foreground="White" />
+                                        </Border>
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis" />
+                                    </DockPanel>
+
+                                    <!-- Subtitle -->
+                                    <TextBlock Grid.Row="1" Text="{Binding Subtitle}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,8" />
+
+                                    <!-- Protocol & Latency -->
+                                    <Grid Grid.Row="3">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}">
+                                            <TextBlock Text="{Binding Protocol}" FontSize="11" FontWeight="Medium" />
+                                        </Border>
+                                        <Border Grid.Column="1" CornerRadius="4" Padding="6,2" Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}">
+                                            <TextBlock Text="{Binding LatencyDisplay}" FontSize="11" FontWeight="Bold" Foreground="#10B981" />
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- Invisible button over card to select -->
+                                    <Button Grid.RowSpan="4" Opacity="0"
+                                            Command="{Binding DataContext.SelectServerCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            Cursor="Hand" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <!-- ================= TAB 1: СЕКЦИЯ VPN ПРОКСИ ================= -->
+            <StackPanel Visibility="{Binding SelectedTabIndex, Converter={StaticResource IndexToVisibilityConverter}, ConverterParameter=1}">
+                <ui:Card Margin="0,0,0,20">
+                    <StackPanel>
+                        <TextBlock Text="Основные параметры секции" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,14" />
+                        
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Margin="0,0,12,0">
+                                <TextBlock Text="Имя секции" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                                <ui:TextBox Text="{Binding Section.Name, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                                <TextBlock Text="Действие" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                                <ComboBox ItemsSource="{Binding AvailableActions}" SelectedItem="{Binding Section.Action}" HorizontalAlignment="Stretch" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Сетевой интерфейс" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                                <ComboBox ItemsSource="{Binding AvailableInterfaces}" SelectedItem="{Binding Section.SelectedInterface}" HorizontalAlignment="Stretch" />
+                            </StackPanel>
+                        </Grid>
+
+                        <CheckBox IsChecked="{Binding Section.IsEnabled}" Content="Включить секцию VPN Прокси" FontWeight="SemiBold" Margin="0,0,0,16" />
+
+                        <!-- Subscription URLs -->
+                        <TextBlock Text="URL подписки" FontSize="16" FontWeight="SemiBold" Margin="0,8,0,8" />
+                        <ItemsControl ItemsSource="{Binding Section.SubscriptionUrls}" Margin="0,0,0,8">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,0,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBox Text="{Binding Mode=OneWay}" IsReadOnly="True" />
+                                        <ui:Button Grid.Column="1" Appearance="Danger" Icon="{ui:SymbolIcon Delete24}" Margin="6,0,0,0"
+                                                   Command="{Binding DataContext.RemoveSubscriptionUrlCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                   CommandParameter="{Binding}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Add Subscription URL -->
+                        <Grid Margin="0,0,0,20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox PlaceholderText="Введите URL подписки (https://...)" 
+                                        Text="{Binding NewSubscriptionUrlInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0" />
+                            <ui:Button Grid.Column="1" Appearance="Primary" Icon="{ui:SymbolIcon Add24}" Content="Добавить" 
+                                       Command="{Binding AddSubscriptionUrlCommand}" />
+                        </Grid>
+
+                        <!-- Connection URLs -->
+                        <TextBlock Text="URL подключения (прямые ссылки на серверы)" FontSize="16" FontWeight="SemiBold" Margin="0,8,0,8" />
+                        <TextBlock Text="Поддерживаются ссылки: vless://, vmess://, ss://, trojan://, socks5://, hy2/hysteria2://" 
+                                   FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6" />
+                        <ItemsControl ItemsSource="{Binding Section.ConnectionUrls}" Margin="0,0,0,8">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,0,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBox Text="{Binding Mode=OneWay}" IsReadOnly="True" />
+                                        <ui:Button Grid.Column="1" Appearance="Danger" Icon="{ui:SymbolIcon Delete24}" Margin="6,0,0,0"
+                                                   Command="{Binding DataContext.RemoveConnectionUrlCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                   CommandParameter="{Binding}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Add Connection URL -->
+                        <Grid Margin="0,0,0,20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox PlaceholderText="Вставьте ссылку vless://, ss://, hy2://..." 
+                                        Text="{Binding NewConnectionUrlInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0" />
+                            <ui:Button Grid.Column="1" Appearance="Primary" Icon="{ui:SymbolIcon Add24}" Content="Добавить" 
+                                       Command="{Binding AddConnectionUrlCommand}" />
+                        </Grid>
+
+                        <!-- Rulesets -->
+                        <TextBlock Text="Встроенные наборы правил (Условия)" FontSize="16" FontWeight="SemiBold" Margin="0,8,0,4" />
+                        <TextBlock Text="Совпадение по доменам, IP-адресам и сервисам назначения для направления через прокси" 
+                                   FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,10" />
+
+                        <!-- Ruleset Chips -->
+                        <ItemsControl ItemsSource="{Binding Section.Rulesets}" Margin="0,0,0,12">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" 
+                                            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" 
+                                            BorderThickness="1" CornerRadius="16" Padding="10,4" Margin="0,0,6,6">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding}" FontSize="12" FontWeight="Medium" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                            <Button Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand"
+                                                    Command="{Binding DataContext.RemoveRulesetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}">
+                                                <ui:SymbolIcon Symbol="DismissCircle24" FontSize="14" Foreground="#EF4444" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Quick suggestions -->
+                        <TextBlock Text="Быстрое добавление популярных правил:" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6" />
+                        <ItemsControl ItemsSource="{Binding QuickRulesetSuggestions}" Margin="0,0,0,14">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <ui:Button Appearance="Secondary" Content="{Binding StringFormat='+ {0}'}" 
+                                               FontSize="11" Padding="8,2" Margin="0,0,6,6"
+                                               Command="{Binding DataContext.AddRulesetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                               CommandParameter="{Binding}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Add custom ruleset -->
+                        <Grid Margin="0,0,0,20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox PlaceholderText="Имя набора правил (например: Steam, Torrent, MyRule)" 
+                                        Text="{Binding NewRulesetInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0" />
+                            <ui:Button Grid.Column="1" Appearance="Secondary" Icon="{ui:SymbolIcon Add24}" Content="Добавить правило" 
+                                       Command="{Binding AddRulesetCommand}" CommandParameter="{Binding NewRulesetInput}" />
+                        </Grid>
+
+                        <Separator Margin="0,10,0,20" />
+
+                        <!-- Save Button -->
+                        <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Checkmark24}" Content="💾 Сохранить секцию и применить в ForkOP" 
+                                   Command="{Binding SaveSectionCommand}" HorizontalAlignment="Left" Padding="20,10" FontWeight="SemiBold" />
+                    </StackPanel>
+                </ui:Card>
+            </StackPanel>
+
+            <!-- ================= TAB 2: СЕРВЕРЫ И УЗЛЫ ================= -->
+            <StackPanel Visibility="{Binding SelectedTabIndex, Converter={StaticResource IndexToVisibilityConverter}, ConverterParameter=2}">
+                <ui:Card Margin="0,0,0,20">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Список серверов и цепочек обхода" FontSize="18" FontWeight="SemiBold" />
+                                <TextBlock Text="Выберите активный сервер или группу URLTest/Priority для маршрутизации трафика" 
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                            </StackPanel>
+                            <ui:Button Grid.Column="1" Appearance="Primary" Icon="{ui:SymbolIcon Flash24}" Content="Замерить задержку всех узлов" 
+                                       Command="{Binding TestLatencyCommand}" />
+                        </Grid>
+
+                        <ItemsControl ItemsSource="{Binding Servers}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" 
+                                            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" 
+                                            BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,8">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                        <Setter Property="BorderBrush" Value="#10B981" />
+                                                        <Setter Property="BorderThickness" Value="2" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="260" />
+                                                <ColumnDefinition Width="130" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="100" />
+                                                <ColumnDefinition Width="140" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" />
+                                                <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+
+                                            <Border Grid.Column="1" CornerRadius="4" Padding="8,2" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                    Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}">
+                                                <TextBlock Text="{Binding Protocol}" FontSize="11" FontWeight="Medium" />
+                                            </Border>
+
+                                            <Border Grid.Column="2" VerticalAlignment="Center">
+                                                <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Left"
+                                                        Background="{Binding IsActive, Converter={StaticResource BoolToStatusBrushConverter}}">
+                                                    <TextBlock Text="{Binding IsActive, Converter={StaticResource BoolToStatusTextConverter}, ConverterParameter='АКТИВЕН|В РЕЗЕРВЕ'}" 
+                                                               FontSize="10" FontWeight="Bold" Foreground="White" />
+                                                </Border>
+                                            </Border>
+
+                                            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <ui:SymbolIcon Symbol="Flash24" FontSize="12" Foreground="#10B981" Margin="0,0,4,0" />
+                                                <TextBlock Text="{Binding LatencyDisplay}" FontWeight="Bold" FontSize="13" Foreground="#10B981" />
+                                            </StackPanel>
+
+                                            <ui:Button Grid.Column="4" Appearance="Secondary" Content="Сделать активным" 
+                                                       Command="{Binding DataContext.SelectServerCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                       CommandParameter="{Binding}"
+                                                       Visibility="{Binding IsActive, Converter={StaticResource InverseBooleanConverter}}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ui:Card>
+            </StackPanel>
+
+            <!-- ================= TAB 3: КОМПОНЕНТЫ И ДИАГНОСТИКА ================= -->
+            <StackPanel Visibility="{Binding SelectedTabIndex, Converter={StaticResource IndexToVisibilityConverter}, ConverterParameter=3}">
+                <!-- Card 1: ForkOP Feed Setup -->
+                <ui:Card Margin="0,0,0,20">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Репозиторий пакетов ForkOP" FontSize="18" FontWeight="SemiBold" />
+                                <TextBlock Text="Предоставляет готовые пакеты PassWall, Sing-box, Xray и DNS-фильтры для вашей архитектуры" 
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                            </StackPanel>
+                            <Border Grid.Column="1" CornerRadius="6" Padding="10,4"
+                                    Background="{Binding FeedInfo.IsConfigured, Converter={StaticResource BoolToStatusBrushConverter}}">
+                                <TextBlock Text="{Binding FeedInfo.IsConfigured, Converter={StaticResource BoolToStatusTextConverter}, ConverterParameter='Подключен|Не настроен'}" 
+                                           FontWeight="SemiBold" FontSize="12" Foreground="White" />
+                            </Border>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Margin="0,0,12,0">
+                                <TextBlock Text="Архитектура процессора роутера" Margin="0,0,0,4" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <ui:TextBox Text="{Binding FeedInfo.Architecture, Mode=OneWay}" IsReadOnly="True" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                                <TextBlock Text="Статус ключа подписи" Margin="0,0,0,4" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <ui:TextBox Text="{Binding FeedInfo.FeedKeyStatus, Mode=OneWay}" IsReadOnly="True" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2" VerticalAlignment="Bottom">
+                                <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Add24}" Content="Подключить ForkOP" 
+                                           Command="{Binding ConfigureRepoCommand}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock Text="{Binding FeedInfo.FeedUrl, StringFormat='Текущий адрес фида: {0}'}" 
+                                   FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                    </StackPanel>
+                </ui:Card>
+
+                <!-- Card 2: Components List -->
+                <ui:Card Margin="0,0,0,20">
+                    <StackPanel>
+                        <TextBlock Text="Компоненты и службы обхода блокировок" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+                        
+                        <ItemsControl ItemsSource="{Binding Components}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" 
+                                            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" 
+                                            BorderThickness="1" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="220" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="140" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" />
+                                                <TextBlock Text="{Binding PackageName}" FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                                            </StackPanel>
+
+                                            <TextBlock Grid.Column="1" Text="{Binding Description}" VerticalAlignment="Center" 
+                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Margin="10,0" />
+
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                <Border CornerRadius="10" Padding="8,2" Margin="0,0,6,0"
+                                                        Background="{Binding IsInstalled, Converter={StaticResource BoolToStatusBrushConverter}}">
+                                                    <TextBlock Text="{Binding IsInstalled, Converter={StaticResource BoolToStatusTextConverter}, ConverterParameter='Установлен|Не установлен'}" 
+                                                               FontSize="11" FontWeight="Medium" Foreground="White" />
+                                                </Border>
+                                                <TextBlock Text="{Binding Version}" FontSize="11" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+
+                                            <ui:Button Grid.Column="3" Appearance="Secondary" Content="Установить" 
+                                                       Command="{Binding DataContext.InstallComponentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                       CommandParameter="{Binding}"
+                                                       Visibility="{Binding IsInstalled, Converter={StaticResource InverseBooleanConverter}}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ui:Card>
+
+                <!-- Card 3: Bypass Diagnostics -->
+                <ui:Card Margin="0,0,0,20">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Диагностика обхода блокировок и прозрачного проксирования" FontSize="18" FontWeight="SemiBold" />
+                                <TextBlock Text="Анализ таблиц nftables/iptables в ядре роутера, перехвата порта 53 и доступности ресурсов" 
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                            </StackPanel>
+                            <ui:Button Grid.Column="1" Appearance="Primary" Icon="{ui:SymbolIcon Stethoscope24}" Content="Запустить тест" 
+                                       Command="{Binding RunDiagnosticsCommand}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Russian Sites -->
+                            <Border Margin="0,0,8,0" Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                <StackPanel>
+                                    <TextBlock Text="Прямой трафик (РФ)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="{Binding DiagResult.DirectRussiaOk, Converter={StaticResource BoolToStatusTextConverter}, ConverterParameter='Работает|Сбой'}" 
+                                               FontWeight="Bold" FontSize="16" Margin="0,4,0,0"
+                                               Foreground="{Binding DiagResult.DirectRussiaOk, Converter={StaticResource BoolToStatusBrushConverter}}" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Blocked Sites Resolution -->
+                            <Border Grid.Column="1" Margin="0,0,8,0" Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                <StackPanel>
+                                    <TextBlock Text="DNS обхода блокировок" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="{Binding DiagResult.ProxyBypassOk, Converter={StaticResource BoolToStatusTextConverter}, ConverterParameter='Разрешается|Блокируется'}" 
+                                               FontWeight="Bold" FontSize="16" Margin="0,4,0,0"
+                                               Foreground="{Binding DiagResult.ProxyBypassOk, Converter={StaticResource BoolToStatusBrushConverter}}" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Kernel Rules -->
+                            <Border Grid.Column="2" Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                <StackPanel>
+                                    <TextBlock Text="Правила фильтрации в ядре" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="{Binding DiagResult.HasTransparentProxyRules, Converter={StaticResource BoolToStatusTextConverter}, ConverterParameter='Внедрены|Не найдены'}" 
+                                               FontWeight="Bold" FontSize="16" Margin="0,4,0,0"
+                                               Foreground="{Binding DiagResult.HasTransparentProxyRules, Converter={StaticResource BoolToStatusBrushConverter}}" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <ItemsControl ItemsSource="{Binding DiagResult.RuleChainsFound}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Margin="0,2">
+                                        <ui:SymbolIcon Symbol="Checkmark24" Foreground="#10B981" Margin="0,0,8,0" FontSize="14" />
+                                        <TextBlock Text="{Binding}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ui:Card>
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

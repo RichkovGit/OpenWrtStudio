@@ -1,0 +1,26 @@
+## Visual Studio / .NET / Rider
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+.idea/
+*.DotSettings.user
+
+## Build Artifacts
+publish/
+publish_singlefile/
+installer_output/
+release_github/*.exe
+release_github/*.zip
+!release_github/SHA256SUMS.txt
+
+## Logs & Temp
+*.log
+crash.log
+test-results/
+TestResults/
+*.tmp
+*.bak
