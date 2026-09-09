@@ -1,0 +1,419 @@
+<ui:FluentWindow x:Class="OpenWrtStudio.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:views="clr-namespace:OpenWrtStudio.Views"
+        mc:Ignorable="d"
+        Title="OpenWrt Studio" Height="820" Width="1240"
+        MinHeight="680" MinWidth="1020"
+        WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- TitleBar -->
+        <ui:TitleBar Grid.Row="0" Title="OpenWrt Studio - Центр управления, Диагностика и Конструктор Mihomo" />
+
+        <!-- Top Connection Bar -->
+        <Border Grid.Row="1" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" 
+                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="16,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <ui:SymbolIcon Symbol="Router24" FontSize="20" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" Margin="0,0,8,0" />
+                    <TextBlock Text="Роутер:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
+                    <ComboBox Width="240" ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" DisplayMemberPath="Name" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="14,0,0,0">
+                    <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Link24}" Content="Подключить" 
+                               Command="{Binding ConnectCommand}" Margin="0,0,6,0"
+                               Visibility="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" />
+                    <ui:Button Appearance="Danger" Icon="{ui:SymbolIcon LinkDismiss24}" Content="Отключить" 
+                               Command="{Binding DisconnectCommand}" 
+                               Visibility="{Binding IsConnected, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                </StackPanel>
+
+                <!-- Status Text & Busy Indicator -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="16,0,0,0" VerticalAlignment="Center">
+                    <ui:ProgressRing IsIndeterminate="True" Width="18" Height="18" Margin="0,0,8,0"
+                                     Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <TextBlock Text="{Binding BusyStatus}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                </StackPanel>
+
+                <!-- Router Host Label -->
+                <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Border CornerRadius="12" Padding="10,3" Margin="0,0,12,0" Background="#10B981"
+                            Visibility="{Binding IsConnected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding ConnectedHost, StringFormat='Онлайн: {0}'}" FontSize="12" FontWeight="SemiBold" Foreground="White" />
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="{Binding ConnectionStatus}" VerticalAlignment="Center" 
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="13" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- SENTINEL WATCHDOG AUTO-HEALING BANNER -->
+        <Border Grid.Row="2" Background="#1F2937" BorderBrush="#EF4444" BorderThickness="0,0,0,2" Padding="16,12"
+                Visibility="{Binding HasActiveIssue, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <ui:SymbolIcon Grid.RowSpan="2" Symbol="Warning24" FontSize="36" Foreground="#EF4444" Margin="0,0,16,0" VerticalAlignment="Center" />
+
+                <!-- Issue Details -->
+                <StackPanel Grid.Row="0" Grid.Column="1">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding ActiveIssue.Title, StringFormat='Обнаружен сбой: {0}'}" FontSize="16" FontWeight="Bold" Foreground="#EF4444" Margin="0,0,12,0" />
+                        <Border Background="#374151" CornerRadius="4" Padding="8,2">
+                            <TextBlock Text="{Binding ActiveIssue.ProviderStatusText}" FontSize="12" FontWeight="SemiBold" Foreground="#F59E0B" />
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="{Binding ActiveIssue.Description}" Margin="0,4,0,0" Foreground="#E5E7EB" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <ui:Button Grid.Row="0" Grid.Column="2" Appearance="Secondary" Content="✕ Скрыть" Command="{Binding DismissIssueCommand}" VerticalAlignment="Top" />
+
+                <!-- Recovery Methods Buttons -->
+                <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,10,0,0">
+                    <TextBlock Text="Предложенные варианты решения:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="#D1D5DB" Margin="0,0,10,0" />
+                    <ItemsControl ItemsSource="{Binding ActiveIssue.RecoveryMethods}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <ui:Button Appearance="Primary" Content="{Binding Name}" Margin="0,0,8,0"
+                                           Command="{Binding DataContext.ApplyHealingMethodCommand, RelativeSource={RelativeSource AncestorType=ui:FluentWindow}}"
+                                           CommandParameter="{Binding}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content Area with Navigation Sidebar -->
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="220" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Navigation Sidebar -->
+            <Border Grid.Column="0" Background="{DynamicResource SolidBackgroundFillColorQuarternaryBrush}" 
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,1,0">
+                <Grid Margin="10,16,10,10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel>
+                        <!-- 0: Дашборд -->
+                        <RadioButton x:Name="NavDashboard" GroupName="MainNavigationGroup"
+                                     IsChecked="{Binding SelectedNavIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0, Mode=TwoWay}"
+                                     Style="{DynamicResource DefaultRadioButtonStyle}" Margin="0,0,0,4">
+                            <RadioButton.Template>
+                                <ControlTemplate TargetType="RadioButton">
+                                    <Border x:Name="Bd" CornerRadius="6" Padding="12,8" Background="Transparent" Cursor="Hand">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="Home24" FontSize="18" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" Margin="0,0,10,0" />
+                                            <TextBlock Text="Дашборд" VerticalAlignment="Center" FontWeight="Medium" />
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentFillColorTertiaryBrush}" />
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </RadioButton.Template>
+                        </RadioButton>
+
+                        <!-- 1: Управление роутером -->
+                        <RadioButton x:Name="NavRouter" GroupName="MainNavigationGroup"
+                                     IsChecked="{Binding SelectedNavIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=1, Mode=TwoWay}"
+                                     Style="{DynamicResource DefaultRadioButtonStyle}" Margin="0,0,0,4">
+                            <RadioButton.Template>
+                                <ControlTemplate TargetType="RadioButton">
+                                    <Border x:Name="Bd" CornerRadius="6" Padding="12,8" Background="Transparent" Cursor="Hand">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="Router24" FontSize="18" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" Margin="0,0,10,0" />
+                                            <TextBlock Text="Управление роутером" VerticalAlignment="Center" FontWeight="Medium" />
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentFillColorTertiaryBrush}" />
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </RadioButton.Template>
+                        </RadioButton>
+
+                        <!-- 2: VPN Протоколы -->
+                        <RadioButton x:Name="NavVpn" GroupName="MainNavigationGroup"
+                                     IsChecked="{Binding SelectedNavIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=2, Mode=TwoWay}"
+                                     Style="{DynamicResource DefaultRadioButtonStyle}" Margin="0,0,0,4">
+                            <RadioButton.Template>
+                                <ControlTemplate TargetType="RadioButton">
+                                    <Border x:Name="Bd" CornerRadius="6" Padding="12,8" Background="Transparent" Cursor="Hand">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="ShieldKeyhole24" FontSize="18" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" Margin="0,0,10,0" />
+                                            <TextBlock Text="VPN Протоколы" VerticalAlignment="Center" FontWeight="Medium" />
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentFillColorTertiaryBrush}" />
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </RadioButton.Template>
+                        </RadioButton>
+
+                        <!-- 3: Конструктор Mihomo -->
+                        <RadioButton x:Name="NavMihomo" GroupName="MainNavigationGroup"
+                                     IsChecked="{Binding SelectedNavIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=3, Mode=TwoWay}"
+                                     Style="{DynamicResource DefaultRadioButtonStyle}" Margin="0,0,0,4">
+                            <RadioButton.Template>
+                                <ControlTemplate TargetType="RadioButton">
+                                    <Border x:Name="Bd" CornerRadius="6" Padding="12,8" Background="Transparent" Cursor="Hand">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="Flash24" FontSize="18" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" Margin="0,0,10,0" />
+                                            <TextBlock Text="Конструктор Mihomo" VerticalAlignment="Center" FontWeight="Medium" />
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentFillColorTertiaryBrush}" />
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </RadioButton.Template>
+                        </RadioButton>
+
+                        <!-- 4: ForkOP & Обход -->
+                        <RadioButton x:Name="NavForkop" GroupName="MainNavigationGroup"
+                                     IsChecked="{Binding SelectedNavIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=4, Mode=TwoWay}"
+                                     Style="{DynamicResource DefaultRadioButtonStyle}" Margin="0,0,0,4">
+                            <RadioButton.Template>
+                                <ControlTemplate TargetType="RadioButton">
+                                    <Border x:Name="Bd" CornerRadius="6" Padding="12,8" Background="Transparent" Cursor="Hand">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="Earth24" FontSize="18" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" Margin="0,0,10,0" />
+                                            <TextBlock Text="ForkOP &amp; Обход" VerticalAlignment="Center" FontWeight="Medium" />
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentFillColorTertiaryBrush}" />
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </RadioButton.Template>
+                        </RadioButton>
+
+                        <!-- 5: Расписания (Cron) -->
+                        <RadioButton x:Name="NavScheduler" GroupName="MainNavigationGroup"
+                                     IsChecked="{Binding SelectedNavIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=5, Mode=TwoWay}"
+                                     Style="{DynamicResource DefaultRadioButtonStyle}" Margin="0,0,0,4">
+                            <RadioButton.Template>
+                                <ControlTemplate TargetType="RadioButton">
+                                    <Border x:Name="Bd" CornerRadius="6" Padding="12,8" Background="Transparent" Cursor="Hand">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="Clock24" FontSize="18" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" Margin="0,0,10,0" />
+                                            <TextBlock Text="Расписания (Cron)" VerticalAlignment="Center" FontWeight="Medium" />
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentFillColorTertiaryBrush}" />
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </RadioButton.Template>
+                        </RadioButton>
+
+                        <!-- 6: Диагностика -->
+                        <RadioButton x:Name="NavDiag" GroupName="MainNavigationGroup"
+                                     IsChecked="{Binding SelectedNavIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=6, Mode=TwoWay}"
+                                     Style="{DynamicResource DefaultRadioButtonStyle}" Margin="0,0,0,4">
+                            <RadioButton.Template>
+                                <ControlTemplate TargetType="RadioButton">
+                                    <Border x:Name="Bd" CornerRadius="6" Padding="12,8" Background="Transparent" Cursor="Hand">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="Stethoscope24" FontSize="18" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" Margin="0,0,10,0" />
+                                            <TextBlock Text="Диагностика" VerticalAlignment="Center" FontWeight="Medium" />
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentFillColorTertiaryBrush}" />
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </RadioButton.Template>
+                        </RadioButton>
+
+                        <!-- 7: Плагины и Темы -->
+                        <RadioButton x:Name="NavPackages" GroupName="MainNavigationGroup"
+                                     IsChecked="{Binding SelectedNavIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=7, Mode=TwoWay}"
+                                     Style="{DynamicResource DefaultRadioButtonStyle}" Margin="0,0,0,4">
+                            <RadioButton.Template>
+                                <ControlTemplate TargetType="RadioButton">
+                                    <Border x:Name="Bd" CornerRadius="6" Padding="12,8" Background="Transparent" Cursor="Hand">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="Apps24" FontSize="18" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" Margin="0,0,10,0" />
+                                            <TextBlock Text="Плагины и Темы" VerticalAlignment="Center" FontWeight="Medium" />
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentFillColorTertiaryBrush}" />
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </RadioButton.Template>
+                        </RadioButton>
+                    </StackPanel>
+
+                    <!-- Footer: 8: Settings item -->
+                    <RadioButton Grid.Row="1" x:Name="NavSettings" GroupName="MainNavigationGroup"
+                                 IsChecked="{Binding SelectedNavIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=8, Mode=TwoWay}"
+                                 Style="{DynamicResource DefaultRadioButtonStyle}">
+                        <RadioButton.Template>
+                            <ControlTemplate TargetType="RadioButton">
+                                <Border x:Name="Bd" CornerRadius="6" Padding="12,10" Background="Transparent" Cursor="Hand">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Symbol="Settings24" FontSize="18" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" Margin="0,0,10,0" />
+                                        <TextBlock Text="Настройки" VerticalAlignment="Center" FontWeight="Medium" />
+                                    </StackPanel>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsChecked" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentFillColorTertiaryBrush}" />
+                                    </Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </RadioButton.Template>
+                    </RadioButton>
+                </Grid>
+            </Border>
+
+            <!-- Main Content Area Container (Guarantees single view rendering with zero overlap) -->
+            <TabControl Grid.Column="1" 
+                        SelectedIndex="{Binding SelectedNavIndex}"
+                        BorderThickness="0"
+                        Background="Transparent"
+                        Padding="0">
+                <TabControl.ItemContainerStyle>
+                    <Style TargetType="TabItem">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                    </Style>
+                </TabControl.ItemContainerStyle>
+                <TabControl.Template>
+                    <ControlTemplate TargetType="TabControl">
+                        <ContentPresenter ContentSource="SelectedContent" Margin="0" />
+                    </ControlTemplate>
+                </TabControl.Template>
+
+                <!-- 0: Дашборд -->
+                <TabItem>
+                    <views:DashboardView DataContext="{Binding DashboardVM}" />
+                </TabItem>
+                <!-- 1: Управление роутером -->
+                <TabItem>
+                    <views:RouterSettingsView DataContext="{Binding RouterSettingsVM}" />
+                </TabItem>
+                <!-- 2: VPN Протоколы -->
+                <TabItem>
+                    <views:VpnProtocolsView DataContext="{Binding VpnVM}" />
+                </TabItem>
+                <!-- 3: Конструктор Mihomo -->
+                <TabItem>
+                    <views:MihomoBuilderView DataContext="{Binding MihomoVM}" />
+                </TabItem>
+                <!-- 4: ForkOP & Обход -->
+                <TabItem>
+                    <views:ForkopView DataContext="{Binding ForkopVM}" />
+                </TabItem>
+                <!-- 5: Расписания (Cron) -->
+                <TabItem>
+                    <views:SchedulerView DataContext="{Binding SchedulerVM}" />
+                </TabItem>
+                <!-- 6: Диагностика -->
+                <TabItem>
+                    <views:DiagnosticsView DataContext="{Binding DiagnosticsVM}" />
+                </TabItem>
+                <!-- 7: Плагины и Темы -->
+                <TabItem>
+                    <views:PackagesView DataContext="{Binding PackagesVM}" />
+                </TabItem>
+                <!-- 8: Настройки -->
+                <TabItem>
+                    <views:SettingsView DataContext="{Binding SettingsVM}" />
+                </TabItem>
+            </TabControl>
+        </Grid>
+
+        <!-- Global Toast Notification Bar -->
+        <ui:InfoBar Grid.Row="4" Title="Уведомление" Message="{Binding NotificationMessage}" 
+                    IsOpen="{Binding ShowNotification}" 
+                    Severity="Informational" 
+                    Margin="16,8" />
+    </Grid>
+</ui:FluentWindow>

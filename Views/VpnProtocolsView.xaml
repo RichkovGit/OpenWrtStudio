@@ -1,0 +1,381 @@
+<UserControl x:Class="OpenWrtStudio.Views.VpnProtocolsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             mc:Ignorable="d" 
+             d:DesignHeight="850" d:DesignWidth="980">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="24">
+            <!-- Header -->
+            <StackPanel Margin="0,0,0,20">
+                <TextBlock Text="VPN Протоколы &amp; Карта возможностей" FontSize="26" FontWeight="SemiBold" />
+                <TextBlock Text="Анализ установленных протоколов на роутере, полная настройка AmneziaWG (AWG), WireGuard, Sing-box, OpenVPN, Tailscale" 
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,0" />
+            </StackPanel>
+
+            <!-- Status Banner -->
+            <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" 
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" 
+                    BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <ui:ProgressRing Width="18" Height="18" IsIndeterminate="True" Margin="0,0,10,0"
+                                         Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center" FontWeight="Medium" />
+                    </StackPanel>
+                    <ui:Button Grid.Column="1" Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Content="Сканировать роутер" Command="{Binding ScanCapabilitiesCommand}" />
+                </Grid>
+            </Border>
+
+            <!-- Card 1: Router Capabilities Matrix -->
+            <ui:Card Margin="0,0,0,20">
+                <StackPanel>
+                    <TextBlock Text="Карта протоколов и служб роутера" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+                    
+                    <ItemsControl ItemsSource="{Binding Protocols}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="3" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" 
+                                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" 
+                                        BorderThickness="1" CornerRadius="8" Padding="12" Margin="4">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Header with status badge -->
+                                        <Grid Grid.Row="0" Margin="0,0,0,6">
+                                            <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="13" />
+                                            <Border HorizontalAlignment="Right" CornerRadius="8" Padding="6,2"
+                                                    Background="{Binding IsRunning, Converter={StaticResource BoolToStatusBrushConverter}}">
+                                                <TextBlock Text="{Binding IsRunning, Converter={StaticResource BoolToStatusTextConverter}, ConverterParameter='Активен|Выключен'}" 
+                                                           FontSize="10" FontWeight="SemiBold" Foreground="White" />
+                                            </Border>
+                                        </Grid>
+
+                                        <!-- Description -->
+                                        <TextBlock Grid.Row="1" Text="{Binding Description}" FontSize="11" 
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,8" />
+
+                                        <!-- Footer: install status or button -->
+                                        <StackPanel Grid.Row="2" Orientation="Horizontal">
+                                            <Border CornerRadius="4" Padding="6,2" Margin="0,0,6,0"
+                                                    Background="{Binding IsInstalled, Converter={StaticResource BoolToStatusBrushConverter}}">
+                                                <TextBlock Text="{Binding IsInstalled, Converter={StaticResource BoolToStatusTextConverter}, ConverterParameter='Установлен|Не установлен'}" 
+                                                           FontSize="10" Foreground="White" />
+                                            </Border>
+                                            <ui:Button Appearance="Primary" Content="Установить" Padding="6,2" FontSize="10"
+                                                       Command="{Binding DataContext.InstallProtocolCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                       CommandParameter="{Binding}"
+                                                       Visibility="{Binding IsInstalled, Converter={StaticResource InverseBooleanConverter}}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ui:Card>
+
+            <!-- Card 2: Multi-Protocol Configurator -->
+            <ui:Card Margin="0,0,0,20">
+                <StackPanel>
+                    <TextBlock Text="Конфигуратор протоколов" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,14" />
+
+                    <!-- Protocol Tabs Selector -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <RadioButton Content="AmneziaWG (AWG)" GroupName="ProtocolTabsGroup"
+                                     IsChecked="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0, Mode=TwoWay}"
+                                     Margin="0,0,10,0" />
+                        <RadioButton Content="Sing-box (Reality / Hysteria 2)" GroupName="ProtocolTabsGroup"
+                                     IsChecked="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=1, Mode=TwoWay}"
+                                     Margin="0,0,10,0" />
+                        <RadioButton Content="OpenVPN" GroupName="ProtocolTabsGroup"
+                                     IsChecked="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=2, Mode=TwoWay}"
+                                     Margin="0,0,10,0" />
+                        <RadioButton Content="Tailscale" GroupName="ProtocolTabsGroup"
+                                     IsChecked="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=3, Mode=TwoWay}" />
+                    </StackPanel>
+
+                    <!-- TAB 0: AMNEZIAWG -->
+                    <StackPanel Visibility="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToVisibilityConverter}, ConverterParameter=0}">
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Настройки AmneziaWG (Анти-DPI WireGuard)" FontWeight="Bold" FontSize="15" />
+                                <TextBlock Text="Поддерживает стандартный WireGuard и параметры обфускации Jc/Jmin/Jmax/S1/S2/H1-H4" 
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                            </StackPanel>
+                            <ui:Button Grid.Column="1" Appearance="Secondary" Icon="{ui:SymbolIcon ArrowUpload24}" Content="Импортировать .conf файл" Command="{Binding ImportAwgConfCommand}" />
+                        </Grid>
+
+                        <TextBlock Text="Интерфейс (Interface)" FontWeight="SemiBold" Margin="0,6,0,6" />
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="100" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="Имя" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding AwgConfig.InterfaceName, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                <TextBlock Text="Адрес (Address)" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding AwgConfig.Address, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2" Margin="0,0,8,0">
+                                <TextBlock Text="DNS" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding AwgConfig.Dns, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="3">
+                                <TextBlock Text="MTU" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding AwgConfig.Mtu, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Margin="0,0,0,10">
+                            <TextBlock Text="Приватный ключ (PrivateKey)" FontSize="11" Margin="0,0,0,2" />
+                            <ui:TextBox Text="{Binding AwgConfig.PrivateKey, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+
+                        <!-- AWG Obfuscation Params Grid -->
+                        <Border Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="Параметры обфускации пакетов AmneziaWG (Обход блокировок ТСПУ/DPI)" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,8" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Margin="0,0,6,0">
+                                        <TextBlock Text="Jc (Junk Count)" FontSize="10" />
+                                        <ui:TextBox Text="{Binding AwgConfig.Jc, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="1" Margin="0,0,6,0">
+                                        <TextBlock Text="Jmin" FontSize="10" />
+                                        <ui:TextBox Text="{Binding AwgConfig.Jmin, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2" Margin="0,0,6,0">
+                                        <TextBlock Text="Jmax" FontSize="10" />
+                                        <ui:TextBox Text="{Binding AwgConfig.Jmax, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="3" Margin="0,0,6,0">
+                                        <TextBlock Text="S1 (Init junk)" FontSize="10" />
+                                        <ui:TextBox Text="{Binding AwgConfig.S1, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Text="S2 (Resp junk)" FontSize="10" />
+                                        <ui:TextBox Text="{Binding AwgConfig.S2, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Margin="0,0,6,0">
+                                        <TextBlock Text="H1 (Init Magic)" FontSize="10" />
+                                        <ui:TextBox Text="{Binding AwgConfig.H1, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="1" Margin="0,0,6,0">
+                                        <TextBlock Text="H2 (Resp Magic)" FontSize="10" />
+                                        <ui:TextBox Text="{Binding AwgConfig.H2, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2" Margin="0,0,6,0">
+                                        <TextBlock Text="H3 (Underload)" FontSize="10" />
+                                        <ui:TextBox Text="{Binding AwgConfig.H3, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="3">
+                                        <TextBlock Text="H4 (Transport)" FontSize="10" />
+                                        <ui:TextBox Text="{Binding AwgConfig.H4, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="Узел подключения (Peer)" FontWeight="SemiBold" Margin="0,0,0,6" />
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="200" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="Публичный ключ сервера (PublicKey)" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding AwgConfig.PeerPublicKey, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Endpoint (Адрес:Порт)" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding AwgConfig.Endpoint, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="140" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="Разрешенные IP (AllowedIPs)" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding AwgConfig.AllowedIPs, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Keepalive (сек)" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding AwgConfig.PersistentKeepalive, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Checkmark24}" Content="Применить AmneziaWG на роутере" Command="{Binding ApplyAwgConfigCommand}" />
+                    </StackPanel>
+
+                    <!-- TAB 1: SING-BOX -->
+                    <StackPanel Visibility="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToVisibilityConverter}, ConverterParameter=1}">
+                        <TextBlock Text="Настройка клиента Sing-box (VLESS Reality / Hysteria 2)" FontWeight="Bold" FontSize="15" Margin="0,0,0,12" />
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="120" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="Протокол" FontSize="11" Margin="0,0,0,2" />
+                                <ComboBox SelectedValue="{Binding SingboxConfig.Protocol, Mode=TwoWay}" SelectedValuePath="Tag">
+                                    <ComboBoxItem Content="VLESS (Reality)" Tag="vless" IsSelected="True" />
+                                    <ComboBoxItem Content="Hysteria 2" Tag="hysteria2" />
+                                    <ComboBoxItem Content="Shadowsocks" Tag="shadowsocks" />
+                                    <ComboBoxItem Content="Trojan" Tag="trojan" />
+                                </ComboBox>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                <TextBlock Text="Сервер (Host / IP)" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding SingboxConfig.ServerAddress, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Порт" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding SingboxConfig.ServerPort, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="UUID / Пароль" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding SingboxConfig.Uuid, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="SNI / Имя сервера (ServerName)" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding SingboxConfig.ServerName, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="140" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="Reality Public Key (для VLESS)" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding SingboxConfig.PublicKey, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Short ID" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding SingboxConfig.ShortId, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Checkmark24}" Content="Развернуть Sing-box на роутере" Command="{Binding ApplySingboxConfigCommand}" />
+                    </StackPanel>
+
+                    <!-- TAB 2: OPENVPN -->
+                    <StackPanel Visibility="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToVisibilityConverter}, ConverterParameter=2}">
+                        <TextBlock Text="Настройка OpenVPN клиента" FontWeight="Bold" FontSize="15" Margin="0,0,0,12" />
+
+                        <StackPanel Margin="0,0,0,10">
+                            <TextBlock Text="Имя профиля" FontSize="11" Margin="0,0,0,2" />
+                            <ui:TextBox Text="{Binding OpenVpnConfig.ProfileName, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+
+                        <StackPanel Margin="0,0,0,12">
+                            <TextBlock Text="Содержимое .ovpn файла конфигурации" FontSize="11" Margin="0,0,0,2" />
+                            <TextBox Text="{Binding OpenVpnConfig.RawOvpnContent, UpdateSourceTrigger=PropertyChanged}" 
+                                     FontFamily="Consolas" Height="140" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" />
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal">
+                            <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowUpload24}" Content="Выбрать .ovpn файл" Command="{Binding ImportOvpnFileCommand}" Margin="0,0,8,0" />
+                            <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Checkmark24}" Content="Применить OpenVPN" Command="{Binding ApplyOpenVpnConfigCommand}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- TAB 3: TAILSCALE -->
+                    <StackPanel Visibility="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToVisibilityConverter}, ConverterParameter=3}">
+                        <TextBlock Text="Настройка Tailscale Mesh VPN" FontWeight="Bold" FontSize="15" Margin="0,0,0,12" />
+
+                        <StackPanel Margin="0,0,0,12">
+                            <TextBlock Text="Tailscale Auth Key (Ключ аутентификации tskey-auth-...)" FontSize="11" Margin="0,0,0,2" />
+                            <ui:TextBox Text="{Binding MeshConfig.TailscaleAuthKey, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                            <CheckBox Content="Принимать маршруты других узлов (--accept-routes)" IsChecked="{Binding MeshConfig.TailscaleAcceptRoutes}" Margin="0,0,16,0" />
+                            <CheckBox Content="Сделать роутер выходным узлом (--advertise-exit-node)" IsChecked="{Binding MeshConfig.TailscaleExitNode}" />
+                        </StackPanel>
+
+                        <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Play24}" Content="Запустить Tailscale" Command="{Binding ApplyTailscaleConfigCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </ui:Card>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
