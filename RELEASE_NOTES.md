@@ -72,14 +72,14 @@
 
 | Файл | Размер | Описание |
 |------|--------|----------|
-| **[OpenWrtStudio_Setup_v2.5.exe](https://github.com/danny/OpenWrtStudio/releases/download/v2.5.0/OpenWrtStudio_Setup_v2.5.exe)** | ~73.0 МБ | Официальный установщик с мастером установки на русском языке |
-| **[OpenWrtStudio_v2.5_Portable.zip](https://github.com/danny/OpenWrtStudio/releases/download/v2.5.0/OpenWrtStudio_v2.5_Portable.zip)** | ~72.6 МБ | Портативная версия без установки (распакуйте и запускайте) |
-| **[SHA256SUMS.txt](https://github.com/danny/OpenWrtStudio/releases/download/v2.5.0/SHA256SUMS.txt)** | <1 КБ | Контрольные суммы SHA-256 для верификации файлов |
+| **[OpenWrtStudio_Setup_v2.5.exe](https://github.com/RichkovGit/OpenWrtStudio/releases/download/v2.5.0/OpenWrtStudio_Setup_v2.5.exe)** | ~73.0 МБ | Официальный установщик с мастером установки на русском языке |
+| **[OpenWrtStudio_v2.5_Portable.zip](https://github.com/RichkovGit/OpenWrtStudio/releases/download/v2.5.0/OpenWrtStudio_v2.5_Portable.zip)** | ~72.6 МБ | Портативная версия без установки (распакуйте и запускайте) |
+| **[SHA256SUMS.txt](https://github.com/RichkovGit/OpenWrtStudio/releases/download/v2.5.0/SHA256SUMS.txt)** | <1 КБ | Контрольные суммы SHA-256 для верификации файлов |
 
 ### 🔒 Контрольные суммы (SHA-256):
 ```
-46e1853c2cdf15cde4def3e493b99e30136fbd8386542856517f92589ee114d7  OpenWrtStudio_Setup_v2.5.exe
-db1535be7c947215af2cb771e6466bf80088fc85f0d80a9c489d3bd60dbc654d  OpenWrtStudio_v2.5_Portable.zip
+ce468b60a45ce0460bc3a621204fadb1e6ed37f7a0760ac76c988d61e9abc32d  OpenWrtStudio_Setup_v2.5.exe
+78b7a43fc0251c71ebf9fcede1c431ad9156c1bc687c498ec1c6e9c065fc83dd  OpenWrtStudio_v2.5_Portable.zip
 ```
 
 ---

@@ -4,8 +4,8 @@
 
 **Современный центр управления, глубокой настройки, мониторинга и автоматического устранения неполадок для роутеров OpenWrt.**
 
-[![Release](https://img.shields.io/badge/release-v2.5.0-blue.svg?style=flat-square)](https://github.com/danny/OpenWrtStudio/releases)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011%20x64-0078D4.svg?style=flat-square)](https://github.com/danny/OpenWrtStudio/releases)
+[![Release](https://img.shields.io/badge/release-v2.5.0-blue.svg?style=flat-square)](https://github.com/RichkovGit/OpenWrtStudio/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011%20x64-0078D4.svg?style=flat-square)](https://github.com/RichkovGit/OpenWrtStudio/releases)
 [![Framework](https://img.shields.io/badge/.NET-8.0%20WPF-512BD4.svg?style=flat-square)](https://dotnet.microsoft.com/)
 [![OpenWrt](https://img.shields.io/badge/OpenWrt-21.02%20--%2025.x-2596be.svg?style=flat-square)](https://openwrt.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
@@ -99,7 +99,7 @@
 
 ## 📥 Загрузка и установка
 
-В разделе [**GitHub Releases**](https://github.com/danny/OpenWrtStudio/releases/latest) доступны два варианта:
+В разделе [**GitHub Releases**](https://github.com/RichkovGit/OpenWrtStudio/releases/latest) доступны два варианта:
 
 ### Вариант 1: Установщик (Рекомендуется)
 * Скачайте файл **`OpenWrtStudio_Setup_v2.5.exe`** (~73 МБ).
@@ -114,8 +114,8 @@
 ## 🔒 Контрольные суммы (SHA-256)
 
 ```text
-46e1853c2cdf15cde4def3e493b99e30136fbd8386542856517f92589ee114d7  OpenWrtStudio_Setup_v2.5.exe
-db1535be7c947215af2cb771e6466bf80088fc85f0d80a9c489d3bd60dbc654d  OpenWrtStudio_v2.5_Portable.zip
+ce468b60a45ce0460bc3a621204fadb1e6ed37f7a0760ac76c988d61e9abc32d  OpenWrtStudio_Setup_v2.5.exe
+78b7a43fc0251c71ebf9fcede1c431ad9156c1bc687c498ec1c6e9c065fc83dd  OpenWrtStudio_v2.5_Portable.zip
 ```
 
 ---
@@ -131,7 +131,7 @@ db1535be7c947215af2cb771e6466bf80088fc85f0d80a9c489d3bd60dbc654d  OpenWrtStudio_
 
 1. **Клонирование репозитория**:
    ```bash
-   git clone https://github.com/danny/OpenWrtStudio.git
+   git clone https://github.com/RichkovGit/OpenWrtStudio.git
    cd OpenWrtStudio
    ```
 

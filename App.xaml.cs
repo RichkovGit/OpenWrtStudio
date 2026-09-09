@@ -42,6 +42,7 @@ public partial class App : Application
         services.AddSingleton<INotificationService, NotificationService>();
         services.AddSingleton<IBackgroundMonitorService, BackgroundMonitorService>();
         services.AddSingleton<ISystemTrayManager, SystemTrayManager>();
+        services.AddSingleton<IUpdateService, UpdateService>();
 
         // ViewModels
         services.AddSingleton<DashboardViewModel>();

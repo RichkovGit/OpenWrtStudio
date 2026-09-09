@@ -15,6 +15,8 @@ public partial class SettingsViewModel : ObservableObject
 {
     private readonly IProfileService _profileService;
     private readonly ISshService _ssh;
+    private readonly IUpdateService _updateService;
+    private readonly INotificationService _notifications;
 
     [ObservableProperty]
     private ObservableCollection<ConnectionProfile> _profiles = new();
@@ -31,10 +33,37 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _isDarkMode = true;
 
-    public SettingsViewModel(IProfileService profileService, ISshService ssh)
+    // OTA Updates
+    [ObservableProperty]
+    private UpdateInfo? _updateInfo;
+
+    [ObservableProperty]
+    private bool _isCheckingUpdate;
+
+    [ObservableProperty]
+    private bool _isDownloadingUpdate;
+
+    [ObservableProperty]
+    private double _downloadProgress;
+
+    [ObservableProperty]
+    private string _updateStatusText = "Нажмите «Проверить обновления» для связи с GitHub.";
+
+    [ObservableProperty]
+    private bool _autoCheckUpdates = true;
+
+    public string CurrentAppVersionString => $"v{_updateService.CurrentVersion.Major}.{_updateService.CurrentVersion.Minor}.{_updateService.CurrentVersion.Build}";
+
+    public SettingsViewModel(
+        IProfileService profileService,
+        ISshService ssh,
+        IUpdateService updateService,
+        INotificationService notifications)
     {
         _profileService = profileService;
         _ssh = ssh;
+        _updateService = updateService;
+        _notifications = notifications;
     }
 
     public async Task InitializeAsync()
@@ -48,6 +77,11 @@ public partial class SettingsViewModel : ObservableObject
         else
         {
             AddNewProfile();
+        }
+
+        if (AutoCheckUpdates)
+        {
+            _ = CheckForUpdatesAsync();
         }
     }
 
@@ -119,5 +153,72 @@ public partial class SettingsViewModel : ObservableObject
     {
         IsDarkMode = !IsDarkMode;
         ApplicationThemeManager.Apply(IsDarkMode ? ApplicationTheme.Dark : ApplicationTheme.Light);
+    }
+
+    [RelayCommand]
+    public async Task CheckForUpdatesAsync()
+    {
+        IsCheckingUpdate = true;
+        UpdateStatusText = "Проверка обновлений на GitHub (RichkovGit/OpenWrtStudio)...";
+        try
+        {
+            var info = await _updateService.CheckForUpdatesAsync();
+            UpdateInfo = info;
+            if (info.IsUpdateAvailable)
+            {
+                UpdateStatusText = $"🎉 Найдена новая версия {info.TagName}! ({info.FormattedSize})";
+                _notifications.ShowNotification("Доступно обновление!", $"Вышла новая версия OpenWrt Studio {info.TagName}. Нажмите для перехода.", NotificationSeverity.Info, "ota_available");
+            }
+            else
+            {
+                UpdateStatusText = $"У вас установлена актуальная версия ({CurrentAppVersionString}).";
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusText = $"Ошибка проверки: {ex.Message}";
+        }
+        finally
+        {
+            IsCheckingUpdate = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task DownloadAndApplyUpdateAsync()
+    {
+        if (UpdateInfo == null || string.IsNullOrWhiteSpace(UpdateInfo.DownloadUrl))
+        {
+            await CheckForUpdatesAsync();
+            if (UpdateInfo == null || !UpdateInfo.IsUpdateAvailable) return;
+        }
+
+        IsDownloadingUpdate = true;
+        DownloadProgress = 0;
+        UpdateStatusText = $"Скачивание обновления {UpdateInfo.TagName}...";
+
+        try
+        {
+            var progress = new Progress<double>(p => DownloadProgress = Math.Round(p, 1));
+            var downloadedFile = await _updateService.DownloadUpdateAsync(UpdateInfo.DownloadUrl, progress);
+            UpdateStatusText = "Запуск программы установки...";
+            await Task.Delay(800);
+            _updateService.LaunchInstallerAndExit(downloadedFile);
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusText = $"Ошибка скачивания: {ex.Message}";
+            IsDownloadingUpdate = false;
+        }
+    }
+
+    [RelayCommand]
+    public void OpenGitHubRepo()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://github.com/RichkovGit/OpenWrtStudio") { UseShellExecute = true });
+        }
+        catch { }
     }
 }
