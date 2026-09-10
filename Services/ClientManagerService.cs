@@ -267,12 +267,27 @@ echo '===SECTION:END==='
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        var blockSections = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var line in lines)
         {
-            var m = Regex.Match(line, @"firewall\.[^.]+\.src_mac='?([0-9a-fA-F:]{17})'?");
+            var m = Regex.Match(line, @"firewall\.([^\.]+)\.name='?Block_([0-9a-fA-F_]{17})(?:_(?:wan|input))?'?", RegexOptions.IgnoreCase);
             if (m.Success)
             {
-                set.Add(m.Groups[1].Value.ToLowerInvariant());
+                blockSections.Add(m.Groups[1].Value);
+            }
+        }
+
+        foreach (var line in lines)
+        {
+            var m = Regex.Match(line, @"firewall\.([^\.]+)\.src_mac='?([0-9a-fA-F:]{17})'?");
+            if (m.Success)
+            {
+                var sec = m.Groups[1].Value;
+                if (blockSections.Contains(sec))
+                {
+                    set.Add(m.Groups[2].Value.ToLowerInvariant());
+                }
             }
         }
         return set;
@@ -298,13 +313,31 @@ echo '===SECTION:END==='
         {
             cmd = $@"
 uci add firewall rule
-uci set firewall.@rule[-1].name='Block_{cleanMac}'
+uci set firewall.@rule[-1].name='Block_{cleanMac}_dhcp'
+uci set firewall.@rule[-1].src='lan'
+uci set firewall.@rule[-1].src_mac='{mac}'
+uci set firewall.@rule[-1].proto='udp'
+uci set firewall.@rule[-1].dest_port='67 68'
+uci set firewall.@rule[-1].target='ACCEPT'
+
+uci add firewall rule
+uci set firewall.@rule[-1].name='Block_{cleanMac}_input'
+uci set firewall.@rule[-1].src='lan'
+uci set firewall.@rule[-1].src_mac='{mac}'
+uci set firewall.@rule[-1].target='DROP'
+
+uci add firewall rule
+uci set firewall.@rule[-1].name='Block_{cleanMac}_wan'
 uci set firewall.@rule[-1].src='lan'
 uci set firewall.@rule[-1].dest='wan'
 uci set firewall.@rule[-1].src_mac='{mac}'
-uci set firewall.@rule[-1].target='REJECT'
+uci set firewall.@rule[-1].target='DROP'
+
 uci commit firewall
 /etc/init.d/firewall reload
+
+ubus call hostapd.phy0-ap0 del_client '{{\""addr\"":\""{mac}\"",\""deauth\"":true}}' 2>/dev/null
+ubus call hostapd.phy1-ap0 del_client '{{\""addr\"":\""{mac}\"",\""deauth\"":true}}' 2>/dev/null
 ";
         }
         else
@@ -319,7 +352,7 @@ uci commit firewall
         }
 
         var (code, outStr, errStr) = await _ssh.ExecuteCommandAsync(cmd, 10);
-        return (code == 0, block ? $"Доступ в интернет заблокирован для {mac}" : $"Доступ в интернет разблокирован для {mac}");
+        return (code == 0, block ? $"Доступ в интернет (включая VPN/иностранный трафик) заблокирован для {mac}" : $"Доступ в интернет разблокирован для {mac}");
     }
 
     public async Task<(bool Success, string Message)> SetStaticLeaseAsync(string mac, string ip, string name)
