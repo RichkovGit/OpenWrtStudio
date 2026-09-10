@@ -256,4 +256,44 @@ public partial class SettingsViewModel : ObservableObject
         }
         catch { }
     }
+
+    [RelayCommand]
+    public void OpenAuthorGitHub()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://github.com/RichkovGit") { UseShellExecute = true });
+        }
+        catch { }
+    }
+
+    [RelayCommand]
+    public void OpenBugReport()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://github.com/RichkovGit/OpenWrtStudio/issues") { UseShellExecute = true });
+        }
+        catch { }
+    }
+
+    [RelayCommand]
+    public void OpenAuthorTelegram()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://t.me/RichkovChannel") { UseShellExecute = true });
+        }
+        catch { }
+    }
+
+    [RelayCommand]
+    public void OpenAppTelegram()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://t.me/OpenWrtStudio") { UseShellExecute = true });
+        }
+        catch { }
+    }
 }

@@ -50,8 +50,7 @@ echo '===SECTION:END==='
         if (code != 0 && string.IsNullOrWhiteSpace(output)) return result;
 
         var sections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var matches = Regex.Matches(output, @"===SECTION:(\w+)===
-?
+        var matches = Regex.Matches(output, @"===SECTION:(\w+)===?
 ([\s\S]*?)(?====SECTION:|$)");
         foreach (Match m in matches)
         {
@@ -208,13 +207,11 @@ echo '===SECTION:END==='
                 client.SignalDbm = sig;
             }
 
-            var rxMatch = Regex.Match(block, @"rx bitrate:\s*([^
-
+            var rxMatch = Regex.Match(block, @"rx bitrate:\s*([^
 ]+)");
             if (rxMatch.Success) client.RxBitrate = rxMatch.Groups[1].Value.Trim();
 
-            var txMatch = Regex.Match(block, @"tx bitrate:\s*([^
-
+            var txMatch = Regex.Match(block, @"tx bitrate:\s*([^
 ]+)");
             if (txMatch.Success) client.TxBitrate = txMatch.Groups[1].Value.Trim();
 
