@@ -107,10 +107,10 @@
                         <StackPanel Orientation="Horizontal">
                             <ui:Button Appearance="{Binding IsExpertMode, Converter={StaticResource InverseBoolToAppearanceConverter}}"
                                        Content="⚡ Простой" Padding="10,4"
-                                       Command="{Binding SetExpertModeCommand}" CommandParameter="False" />
+                                       Command="{Binding EnableSimpleModeCommand}" />
                             <ui:Button Appearance="{Binding IsExpertMode, Converter={StaticResource BoolToAppearanceConverter}}"
                                        Content="🛠️ Эксперт" Padding="10,4"
-                                       Command="{Binding SetExpertModeCommand}" CommandParameter="True" />
+                                       Command="{Binding EnableExpertModeCommand}" />
                         </StackPanel>
                     </Border>
 

@@ -12,6 +12,10 @@ public partial class MainWindow : FluentWindow
     {
         InitializeComponent();
 
+        WindowBackdropType = WindowBackdropType.None;
+        SetResourceReference(BackgroundProperty, "SolidBackgroundFillColorBaseBrush");
+        SetResourceReference(ForegroundProperty, "TextFillColorPrimaryBrush");
+
         try
         {
             var iconUri = new Uri("pack://application:,,,/Assets/app.ico", UriKind.RelativeOrAbsolute);

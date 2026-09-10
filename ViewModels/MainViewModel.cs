@@ -86,9 +86,15 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public void SetExpertMode(bool expert)
+    public void EnableSimpleMode()
     {
-        IsExpertMode = expert;
+        IsExpertMode = false;
+    }
+
+    [RelayCommand]
+    public void EnableExpertMode()
+    {
+        IsExpertMode = true;
     }
 
     // ViewModels references

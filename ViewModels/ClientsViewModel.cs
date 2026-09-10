@@ -55,19 +55,33 @@ public partial class ClientsViewModel : ObservableObject
         try
         {
             var list = await _clientManager.GetClientsAsync();
-            Clients.Clear();
-            foreach (var c in list)
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess())
             {
-                Clients.Add(c);
+                dispatcher.Invoke(() =>
+                {
+                    Clients.Clear();
+                    foreach (var c in list) Clients.Add(c);
+                    TotalCount = Clients.Count;
+                    Wifi5Count = Clients.Count(x => x.Band == "5 GHz");
+                    Wifi24Count = Clients.Count(x => x.Band == "2.4 GHz");
+                    LanCount = Clients.Count(x => x.Band == "LAN");
+                    BlockedCount = Clients.Count(x => x.IsBlocked);
+                    ApplyFilter();
+                });
+            }
+            else
+            {
+                Clients.Clear();
+                foreach (var c in list) Clients.Add(c);
+                TotalCount = Clients.Count;
+                Wifi5Count = Clients.Count(x => x.Band == "5 GHz");
+                Wifi24Count = Clients.Count(x => x.Band == "2.4 GHz");
+                LanCount = Clients.Count(x => x.Band == "LAN");
+                BlockedCount = Clients.Count(x => x.IsBlocked);
+                ApplyFilter();
             }
 
-            TotalCount = Clients.Count;
-            Wifi5Count = Clients.Count(x => x.Band == "5 GHz");
-            Wifi24Count = Clients.Count(x => x.Band == "2.4 GHz");
-            LanCount = Clients.Count(x => x.Band == "LAN");
-            BlockedCount = Clients.Count(x => x.IsBlocked);
-
-            ApplyFilter();
             StatusMessage = $"Обновлено: {DateTime.Now:HH:mm:ss} • Найдено {TotalCount} устройств";
         }
         catch (Exception ex)
@@ -104,10 +118,19 @@ public partial class ClientsViewModel : ObservableObject
             };
         }).ToList();
 
-        FilteredClients.Clear();
-        foreach (var item in filtered)
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess())
         {
-            FilteredClients.Add(item);
+            dispatcher.Invoke(() =>
+            {
+                FilteredClients.Clear();
+                foreach (var item in filtered) FilteredClients.Add(item);
+            });
+        }
+        else
+        {
+            FilteredClients.Clear();
+            foreach (var item in filtered) FilteredClients.Add(item);
         }
     }
 
