@@ -271,7 +271,7 @@ echo '===SECTION:END==='
 
         foreach (var line in lines)
         {
-            var m = Regex.Match(line, @"firewall\.([^\.]+)\.name='?Block_([0-9a-fA-F_]{17})(?:_(?:wan|input))?'?", RegexOptions.IgnoreCase);
+            var m = Regex.Match(line, @"firewall\.([^\.]+)\.name='?Block_([0-9a-fA-F_]{17})(?:_(?:wan|input|dhcp|luci))?'?", RegexOptions.IgnoreCase);
             if (m.Success)
             {
                 blockSections.Add(m.Groups[1].Value);
@@ -312,6 +312,14 @@ echo '===SECTION:END==='
         if (block)
         {
             cmd = $@"
+# Clean any existing rules first to prevent duplicates
+while true; do
+    sec=$(uci show firewall | grep -i 'Block_{cleanMac}' | head -n1 | cut -d'.' -f2 | cut -d'=' -f1)
+    [ -z ""$sec"" ] && break
+    uci delete firewall.$sec 2>/dev/null
+done
+
+# 1. Allow DHCP to keep client connected to LAN
 uci add firewall rule
 uci set firewall.@rule[-1].name='Block_{cleanMac}_dhcp'
 uci set firewall.@rule[-1].src='lan'
@@ -320,12 +328,23 @@ uci set firewall.@rule[-1].proto='udp'
 uci set firewall.@rule[-1].dest_port='67 68'
 uci set firewall.@rule[-1].target='ACCEPT'
 
+# 2. Allow router web management (ports 80 & 443) so client can manage router & unblock
+uci add firewall rule
+uci set firewall.@rule[-1].name='Block_{cleanMac}_luci'
+uci set firewall.@rule[-1].src='lan'
+uci set firewall.@rule[-1].src_mac='{mac}'
+uci set firewall.@rule[-1].proto='tcp'
+uci set firewall.@rule[-1].dest_port='80 443'
+uci set firewall.@rule[-1].target='ACCEPT'
+
+# 3. Drop all other traffic to router (TPROXY :1602 Sing-box, DNS :53, ForkOP DNS :1603)
 uci add firewall rule
 uci set firewall.@rule[-1].name='Block_{cleanMac}_input'
 uci set firewall.@rule[-1].src='lan'
 uci set firewall.@rule[-1].src_mac='{mac}'
 uci set firewall.@rule[-1].target='DROP'
 
+# 4. Drop direct WAN traffic
 uci add firewall rule
 uci set firewall.@rule[-1].name='Block_{cleanMac}_wan'
 uci set firewall.@rule[-1].src='lan'
