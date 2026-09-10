@@ -153,6 +153,23 @@ a9c7ebe4f54916adfc0d5ba968dbbdf4ae3b8aea5a719d17dacbf4177e7cc6ed  OpenWrtStudio_
 
 ---
 
+
+---
+
+## 📱 Мобильная версия для Android
+
+Доступно официальное мобильное приложение **[OpenWrt Studio Mobile](https://github.com/RichkovGit/OpenWrtStudio-Mobile)**:
+- Управление клиентами, привязка статических IP, отключение интернета на устройствах в один тап.
+- Мониторинг интерфейсов, ForkOP прокси, Sentinel Watchdog и быстрые команды.
+- [Галерея скриншотов и загрузка APK](https://github.com/RichkovGit/OpenWrtStudio-Mobile).
+
+---
+
+## 💬 Сообщество и каналы
+- 📢 **Telegram-канал программы**: [@OpenWrtStudio](https://t.me/OpenWrtStudio)
+- 📢 **Telegram-канал автора**: [@RichkovChannel](https://t.me/RichkovChannel)
+- 🐛 **Багрепорт и предложения**: [GitHub Issues](https://github.com/RichkovGit/OpenWrtStudio/issues)
+
 ## 📜 Лицензия
 
 Проект распространяется под свободной лицензией [MIT](LICENSE).
