@@ -61,9 +61,84 @@ public partial class App : Application
         services.AddSingleton<MainWindow>();
     }
 
+    private const string MutexName = @"Global\OpenWrtStudio_SingleInstance_Mutex_98f12a";
+    private const string EventName = @"Global\OpenWrtStudio_ActivateInstance_Event_98f12a";
+
+    private Mutex? _instanceMutex;
+    private EventWaitHandle? _activateEvent;
+    private RegisteredWaitHandle? _registeredWait;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    private const int SW_RESTORE = 9;
+
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // Check if an instance is already running
+        bool isFirstInstance;
+        try
+        {
+            _instanceMutex = new Mutex(true, MutexName, out isFirstInstance);
+        }
+        catch (AbandonedMutexException)
+        {
+            isFirstInstance = true;
+        }
+
+        if (!isFirstInstance)
+        {
+            // Another instance is already running! Signal it to bring window to front and exit
+            try
+            {
+                using var evt = EventWaitHandle.OpenExisting(EventName);
+                evt.Set();
+            }
+            catch { }
+
+            Shutdown();
+            return;
+        }
+
+        // Setup event listener so future shortcut clicks activate this instance
+        try
+        {
+            _activateEvent = new EventWaitHandle(false, EventResetMode.AutoReset, EventName);
+            _registeredWait = ThreadPool.RegisterWaitForSingleObject(_activateEvent, (state, timedOut) =>
+            {
+                Dispatcher.BeginInvoke(() =>
+                {
+                    try
+                    {
+                        var mainWindow = _serviceProvider.GetService<MainWindow>();
+                        if (mainWindow != null)
+                        {
+                            mainWindow.Show();
+                            if (mainWindow.WindowState == WindowState.Minimized)
+                            {
+                                mainWindow.WindowState = WindowState.Normal;
+                            }
+                            mainWindow.Activate();
+                            mainWindow.Focus();
+
+                            var hwnd = new System.Windows.Interop.WindowInteropHelper(mainWindow).Handle;
+                            if (hwnd != IntPtr.Zero)
+                            {
+                                ShowWindow(hwnd, SW_RESTORE);
+                                SetForegroundWindow(hwnd);
+                            }
+                        }
+                    }
+                    catch { }
+                });
+            }, null, -1, false);
+        }
+        catch { }
 
         try
         {
@@ -109,6 +184,18 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        try
+        {
+            _registeredWait?.Unregister(null);
+            _activateEvent?.Dispose();
+            if (_instanceMutex != null)
+            {
+                _instanceMutex.ReleaseMutex();
+                _instanceMutex.Dispose();
+            }
+        }
+        catch { }
+
         try
         {
             _serviceProvider.GetService<ISystemTrayManager>()?.Dispose();

@@ -23,7 +23,7 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
-                                <Setter Property="Foreground" Value="White" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bd" Property="Opacity" Value="0.9" />
@@ -149,6 +149,147 @@
                         </StackPanel>
                     </ui:Card>
                 </Grid>
+
+                <!-- Доступные действия (Available Actions) Panel -->
+                <ui:Card Margin="0,0,0,20" Padding="16">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <ui:SymbolIcon Symbol="Flash24" Foreground="{DynamicResource AccentFillColorDefaultBrush}" Margin="0,0,8,0" />
+                            <TextBlock Text="Доступные действия" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
+                        </StackPanel>
+                        
+                        <!-- 6 Action Buttons in a responsive WrapPanel -->
+                        <WrapPanel Orientation="Horizontal">
+                            <!-- 1. Перезапустить Forkop (Зеленая) -->
+                            <Button Margin="0,0,10,10" Height="40" Padding="18,0" Command="{Binding RestartForkopCommand}"
+                                    Background="#22C55E" Foreground="White" BorderThickness="0" Cursor="Hand">
+                                <Button.Resources>
+                                    <Style TargetType="Border">
+                                        <Setter Property="CornerRadius" Value="8" />
+                                    </Style>
+                                </Button.Resources>
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="ArrowClockwise24" Foreground="White" Margin="0,0,8,0" />
+                                    <TextBlock Text="Перезапустить Forkop" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+
+                            <!-- 2. Остановить Forkop (Темно-красная) -->
+                            <Button Margin="0,0,10,10" Height="40" Padding="18,0" Command="{Binding StopForkopCommand}"
+                                    Background="#7F1D1D" Foreground="#FCA5A5" BorderBrush="#991B1B" BorderThickness="1" Cursor="Hand">
+                                <Button.Resources>
+                                    <Style TargetType="Border">
+                                        <Setter Property="CornerRadius" Value="8" />
+                                    </Style>
+                                </Button.Resources>
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="Stop24" Foreground="#FCA5A5" Margin="0,0,8,0" />
+                                    <TextBlock Text="Остановить Forkop" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+
+                            <!-- 3. Отключить автостарт (Бордовая) -->
+                            <Button Margin="0,0,10,10" Height="40" Padding="18,0" Command="{Binding ToggleAutostartCommand}"
+                                    Background="#581C1C" Foreground="#FECACA" BorderBrush="#7F1D1D" BorderThickness="1" Cursor="Hand">
+                                <Button.Resources>
+                                    <Style TargetType="Border">
+                                        <Setter Property="CornerRadius" Value="8" />
+                                    </Style>
+                                </Button.Resources>
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="Prohibited24" Foreground="#FECACA" Margin="0,0,8,0" />
+                                    <TextBlock Text="Отключить автостарт" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+
+                            <!-- 4. Получить глобальную проверку (Синяя) -->
+                            <Button Margin="0,0,10,10" Height="40" Padding="18,0" Command="{Binding GlobalCheckCommand}"
+                                    Background="#2563EB" Foreground="White" BorderThickness="0" Cursor="Hand">
+                                <Button.Resources>
+                                    <Style TargetType="Border">
+                                        <Setter Property="CornerRadius" Value="8" />
+                                    </Style>
+                                </Button.Resources>
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="CheckmarkCircle24" Foreground="White" Margin="0,0,8,0" />
+                                    <TextBlock Text="Получить глобальную проверку" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+
+                            <!-- 5. Посмотреть логи (Синяя) -->
+                            <Button Margin="0,0,10,10" Height="40" Padding="18,0" Command="{Binding ViewLogsCommand}"
+                                    Background="#3B82F6" Foreground="White" BorderThickness="0" Cursor="Hand">
+                                <Button.Resources>
+                                    <Style TargetType="Border">
+                                        <Setter Property="CornerRadius" Value="8" />
+                                    </Style>
+                                </Button.Resources>
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="DocumentText24" Foreground="White" Margin="0,0,8,0" />
+                                    <TextBlock Text="Посмотреть логи" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+
+                            <!-- 6. Показать sing-box конфигурацию (Синяя) -->
+                            <Button Margin="0,0,10,10" Height="40" Padding="18,0" Command="{Binding ViewSingboxConfigCommand}"
+                                    Background="#3B82F6" Foreground="White" BorderThickness="0" Cursor="Hand">
+                                <Button.Resources>
+                                    <Style TargetType="Border">
+                                        <Setter Property="CornerRadius" Value="8" />
+                                    </Style>
+                                </Button.Resources>
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="Settings24" Foreground="White" Margin="0,0,8,0" />
+                                    <TextBlock Text="Показать sing-box конфигурацию" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </WrapPanel>
+
+                        <!-- Log Viewer Modal / Inset Card -->
+                        <Border Visibility="{Binding IsLogViewerOpen, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}" 
+                                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="14" Margin="0,10,0,0">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <TextBlock Text="📜 Системные логи ForkOP &amp; Sing-box" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" />
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon Copy24}" Content="Скопировать" 
+                                                   Command="{Binding CopyLogsCommand}" Margin="0,0,8,0" />
+                                        <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon Dismiss24}" Content="Закрыть" 
+                                                   Command="{Binding CloseLogViewerCommand}" />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBox Text="{Binding LogContent, Mode=OneWay}" IsReadOnly="True" 
+                                         FontFamily="Consolas, Cascadia Code, Courier New" FontSize="12"
+                                         TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Height="220"
+                                         Background="#0F172A" Foreground="#E2E8F0" Padding="10" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Sing-box Config Viewer Modal / Inset Card -->
+                        <Border Visibility="{Binding IsConfigViewerOpen, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}" 
+                                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="14" Margin="0,10,0,0">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <TextBlock Text="⚙️ Конфигурация /etc/sing-box/config.json" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" />
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon Copy24}" Content="Скопировать" 
+                                                   Command="{Binding CopyConfigCommand}" Margin="0,0,8,0" />
+                                        <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon Dismiss24}" Content="Закрыть" 
+                                                   Command="{Binding CloseConfigViewerCommand}" />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBox Text="{Binding SingboxConfigContent, Mode=OneWay}" IsReadOnly="True" 
+                                         FontFamily="Consolas, Cascadia Code, Courier New" FontSize="12"
+                                         TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Height="250"
+                                         Background="#0F172A" Foreground="#E2E8F0" Padding="10" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ui:Card>
 
                 <!-- VPN Proxy Header & Action Buttons -->
                 <Grid Margin="0,0,0,14">

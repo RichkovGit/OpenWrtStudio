@@ -386,4 +386,198 @@ public partial class ForkopViewModel : ObservableObject
             IsDiagnosing = false;
         }
     }
+
+    // ==========================================
+    // Available Actions (Доступные действия)
+    // ==========================================
+    [ObservableProperty] private string _logContent = "";
+    [ObservableProperty] private bool _isLogViewerOpen;
+    [ObservableProperty] private string _singboxConfigContent = "";
+    [ObservableProperty] private bool _isConfigViewerOpen;
+    [ObservableProperty] private bool _isForkopAutostartEnabled = true;
+
+    [RelayCommand]
+    public async Task RestartForkopAsync()
+    {
+        if (!_ssh.IsConnected)
+        {
+            StatusMessage = "Нет подключения к роутеру по SSH.";
+            return;
+        }
+
+        IsLoading = true;
+        StatusMessage = "Перезапуск службы ForkOP на роутере (/etc/init.d/forkop restart)...";
+        try
+        {
+            var res = await _ssh.ExecuteCommandAsync("/etc/init.d/forkop restart", 15);
+            StatusMessage = string.IsNullOrWhiteSpace(res.Error) ? "ForkOP успешно перезапущен." : $"ForkOP: {res.Output} {res.Error}";
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Ошибка перезапуска: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task StopForkopAsync()
+    {
+        if (!_ssh.IsConnected)
+        {
+            StatusMessage = "Нет подключения к роутеру по SSH.";
+            return;
+        }
+
+        IsLoading = true;
+        StatusMessage = "Остановка службы ForkOP (/etc/init.d/forkop stop)...";
+        try
+        {
+            var res = await _ssh.ExecuteCommandAsync("/etc/init.d/forkop stop", 15);
+            StatusMessage = "Служба ForkOP остановлена.";
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Ошибка остановки: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task ToggleAutostartAsync()
+    {
+        if (!_ssh.IsConnected)
+        {
+            StatusMessage = "Нет подключения к роутеру по SSH.";
+            return;
+        }
+
+        IsLoading = true;
+        StatusMessage = "Переключение автостарта ForkOP (/etc/init.d/forkop disable/enable)...";
+        try
+        {
+            var chk = await _ssh.ExecuteCommandAsync("/etc/init.d/forkop enabled && echo enabled || echo disabled", 5);
+            var isEnabled = chk.Output.Contains("enabled");
+            var action = isEnabled ? "disable" : "enable";
+            await _ssh.ExecuteCommandAsync($"/etc/init.d/forkop {action}", 10);
+            IsForkopAutostartEnabled = !isEnabled;
+            StatusMessage = isEnabled ? "Автостарт ForkOP отключен." : "Автостарт ForkOP включен.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Ошибка автостарта: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task GlobalCheckAsync()
+    {
+        if (!_ssh.IsConnected)
+        {
+            StatusMessage = "Нет подключения к роутеру по SSH.";
+            return;
+        }
+
+        StatusMessage = "Запуск глобальной проверки ForkOP...";
+        await TestLatencyAsync();
+    }
+
+    [RelayCommand]
+    public async Task ViewLogsAsync()
+    {
+        if (!_ssh.IsConnected)
+        {
+            StatusMessage = "Нет подключения к роутеру по SSH.";
+            return;
+        }
+
+        IsLoading = true;
+        StatusMessage = "Получение логов ForkOP и Sing-box с роутера...";
+        try
+        {
+            var res = await _ssh.ExecuteCommandAsync("logread -e forkop -e sing-box | tail -n 120", 10);
+            LogContent = string.IsNullOrWhiteSpace(res.Output) ? "Логи не найдены или пусты." : res.Output;
+            IsLogViewerOpen = true;
+            StatusMessage = "Логи успешно получены.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Ошибка чтения логов: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public void CloseLogViewer()
+    {
+        IsLogViewerOpen = false;
+    }
+
+    [RelayCommand]
+    public void CopyLogs()
+    {
+        if (!string.IsNullOrEmpty(LogContent))
+        {
+            System.Windows.Clipboard.SetText(LogContent);
+            StatusMessage = "Логи скопированы в буфер обмена.";
+        }
+    }
+
+    [RelayCommand]
+    public async Task ViewSingboxConfigAsync()
+    {
+        if (!_ssh.IsConnected)
+        {
+            StatusMessage = "Нет подключения к роутеру по SSH.";
+            return;
+        }
+
+        IsLoading = true;
+        StatusMessage = "Чтение конфигурации /etc/sing-box/config.json...";
+        try
+        {
+            var res = await _ssh.ExecuteCommandAsync("cat /etc/sing-box/config.json", 10);
+            SingboxConfigContent = string.IsNullOrWhiteSpace(res.Output) ? "{}" : res.Output;
+            IsConfigViewerOpen = true;
+            StatusMessage = "Конфигурация Sing-box загружена.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Ошибка чтения конфига: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public void CloseConfigViewer()
+    {
+        IsConfigViewerOpen = false;
+    }
+
+    [RelayCommand]
+    public void CopyConfig()
+    {
+        if (!string.IsNullOrEmpty(SingboxConfigContent))
+        {
+            System.Windows.Clipboard.SetText(SingboxConfigContent);
+            StatusMessage = "Конфигурация Sing-box скопирована в буфер обмена.";
+        }
+    }
 }
