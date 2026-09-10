@@ -24,6 +24,19 @@
 
 ---
 
+
+## 📸 Скриншоты десктопного интерфейса
+
+| Дашборд и ресурсы | Управление клиентами | Настройки и профили |
+| :---: | :---: | :---: |
+| <img src="screenshots/01_dashboard.png" width="280"/> | <img src="screenshots/02_clients.png" width="280"/> | <img src="screenshots/03_settings.png" width="280"/> |
+
+| Управление Wi-Fi и сетью | VPN Протоколы и Карта возможностей |
+| :---: | :---: |
+| <img src="screenshots/04_wifi_network.png" width="380"/> | <img src="screenshots/05_vpn_matrix.png" width="380"/> |
+
+---
+
 ## 🚀 Ключевые возможности
 
 ### 1. 🔔 Фоновый мониторинг и Уведомления Windows
