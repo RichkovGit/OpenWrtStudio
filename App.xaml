@@ -19,6 +19,14 @@
             <converters:BoolToThicknessConverter x:Key="BoolToThicknessConverter" />
             <converters:BoolToSelectedTextConverter x:Key="BoolToSelectedTextConverter" />
             <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
+            <converters:EqualStringToAppearanceConverter x:Key="EqualStringToAppearanceConverter" />
+            <converters:BoolToStaticTextConverter x:Key="BoolToStaticTextConverter" />
+            <converters:BoolToStaticBrushConverter x:Key="BoolToStaticBrushConverter" />
+            <converters:BlockToAppearanceConverter x:Key="BlockToAppearanceConverter" />
+            <converters:BlockToTextConverter x:Key="BlockToTextConverter" />
+            <converters:BoolToAppearanceConverter x:Key="BoolToAppearanceConverter" />
+            <converters:InverseBoolToAppearanceConverter x:Key="InverseBoolToAppearanceConverter" />
+            <converters:StringNotEmptyToVisibilityConverter x:Key="StringNotEmptyToVisibilityConverter" />
             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         </ResourceDictionary>
     </Application.Resources>

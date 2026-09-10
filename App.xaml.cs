@@ -44,9 +44,11 @@ public partial class App : Application
         services.AddSingleton<ISystemTrayManager, SystemTrayManager>();
         services.AddSingleton<IUpdateService, UpdateService>();
         services.AddSingleton<IThemeService, ThemeService>();
+        services.AddSingleton<IClientManagerService, ClientManagerService>();
 
         // ViewModels
         services.AddSingleton<DashboardViewModel>();
+        services.AddSingleton<ClientsViewModel>();
         services.AddSingleton<RouterSettingsViewModel>();
         services.AddSingleton<VpnProtocolsViewModel>();
         services.AddSingleton<MihomoBuilderViewModel>();

@@ -75,8 +75,25 @@ public partial class MainViewModel : ObservableObject
         };
     }
 
+    // --- Mode Switcher (Simple vs Expert) ---
+    [ObservableProperty]
+    private bool _isExpertMode = false;
+
+    [RelayCommand]
+    public void ToggleExpertMode()
+    {
+        IsExpertMode = !IsExpertMode;
+    }
+
+    [RelayCommand]
+    public void SetExpertMode(bool expert)
+    {
+        IsExpertMode = expert;
+    }
+
     // ViewModels references
     public DashboardViewModel DashboardVM { get; }
+    public ClientsViewModel ClientsVM { get; }
     public RouterSettingsViewModel RouterSettingsVM { get; }
     public VpnProtocolsViewModel VpnVM { get; }
     public MihomoBuilderViewModel MihomoVM { get; }
@@ -91,6 +108,7 @@ public partial class MainViewModel : ObservableObject
         IProfileService profileService,
         ISentinelService sentinelService,
         DashboardViewModel dashboardVM,
+        ClientsViewModel clientsVM,
         RouterSettingsViewModel routerSettingsVM,
         VpnProtocolsViewModel vpnVM,
         MihomoBuilderViewModel mihomoVM,
@@ -104,6 +122,7 @@ public partial class MainViewModel : ObservableObject
         _profileService = profileService;
         _sentinelService = sentinelService;
         DashboardVM = dashboardVM;
+        ClientsVM = clientsVM;
         RouterSettingsVM = routerSettingsVM;
         VpnVM = vpnVM;
         MihomoVM = mihomoVM;
@@ -163,6 +182,7 @@ public partial class MainViewModel : ObservableObject
             ShowAlert($"Успешное подключение к {SelectedProfile.Host}!", false);
             await DashboardVM.RefreshDashboardAsync();
             await _sentinelService.ProbeHealthAsync();
+            _ = ClientsVM.LoadClientsAsync();
             _ = VpnVM.ScanCapabilitiesAsync();
             _ = RouterSettingsVM.LoadAllConfigsAsync();
             _ = ForkopVM.LoadDataAsync();
