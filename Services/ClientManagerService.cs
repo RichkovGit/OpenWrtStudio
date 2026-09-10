@@ -343,8 +343,10 @@ ubus call hostapd.phy1-ap0 del_client '{{\""addr\"":\""{mac}\"",\""deauth\"":tru
         else
         {
             cmd = $@"
-for s in $(uci show firewall | grep 'Block_{cleanMac}' | cut -d'.' -f2 | cut -d'=' -f1 | sort -u); do
-    uci delete firewall.$s 2>/dev/null
+while true; do
+    sec=$(uci show firewall | grep -i 'Block_{cleanMac}' | head -n1 | cut -d'.' -f2 | cut -d'=' -f1)
+    [ -z ""$sec"" ] && break
+    uci delete firewall.$sec 2>/dev/null
 done
 uci commit firewall
 /etc/init.d/firewall reload
