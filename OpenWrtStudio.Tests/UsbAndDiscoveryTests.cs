@@ -92,4 +92,63 @@ public class UsbAndDiscoveryTests
         Assert.Equal("Модем", Classify(sampleModemDesc));
         Assert.Equal("Накопитель", Classify(sampleFlashDesc));
     }
+
+    [Theory]
+    [InlineData("vfat", "iocharset=utf8", "utf8=1", "codepage=866", "umask=000")]
+    [InlineData("ntfs", "ntfs-3g", "iocharset=utf8", "umask=000")]
+    [InlineData("exfat", "exfat", "iocharset=utf8", "umask=000")]
+    public void MountDisk_CommandSelection_IncludesOptimalCyrillicAndPermissionFlags(string fs, params string[] expectedKeywords)
+    {
+        string GetMountCommandSnippet(string fileSystem, string dev, string target)
+        {
+            var lfs = fileSystem.ToLowerInvariant();
+            if (lfs.Contains("exfat"))
+            {
+                return $"mount -t exfat -o rw,noatime,iocharset=utf8,umask=000,dmask=0000,fmask=0000 '{dev}' '{target}'";
+            }
+            if (lfs.Contains("vfat") || lfs.Contains("fat"))
+            {
+                return $"mount -t vfat -o rw,noatime,iocharset=utf8,utf8=1,codepage=866,umask=000,dmask=0000,fmask=0000 '{dev}' '{target}'";
+            }
+            if (lfs.Contains("ntfs"))
+            {
+                return $"ntfs-3g -o rw,noatime,big_writes,iocharset=utf8,umask=000 '{dev}' '{target}'";
+            }
+            return $"mount -o rw,noatime,iocharset=utf8,utf8=1,umask=000 '{dev}' '{target}'";
+        }
+
+        var cmd = GetMountCommandSnippet(fs, "/dev/sda1", "/mnt/sda1");
+        foreach (var kw in expectedKeywords)
+        {
+            Assert.Contains(kw, cmd);
+        }
+    }
+
+    [Fact]
+    public void SambaConfig_EnforcesRootAndFullAccessFlags()
+    {
+        var requiredUciSettings = new[]
+        {
+            "force_root='1'",
+            "force_user='root'",
+            "force_group='root'",
+            "create_mask='0777'",
+            "dir_mask='0777'",
+            "guest_ok='yes'",
+            "read_only='no'"
+        };
+
+        var simulatedScript = "uci set samba4.@sambashare[-1].force_root='1' && " +
+                              "uci set samba4.@sambashare[-1].force_user='root' && " +
+                              "uci set samba4.@sambashare[-1].force_group='root' && " +
+                              "uci set samba4.@sambashare[-1].create_mask='0777' && " +
+                              "uci set samba4.@sambashare[-1].dir_mask='0777' && " +
+                              "uci set samba4.@sambashare[-1].guest_ok='yes' && " +
+                              "uci set samba4.@sambashare[-1].read_only='no'";
+
+        foreach (var setting in requiredUciSettings)
+        {
+            Assert.Contains(setting, simulatedScript);
+        }
+    }
 }

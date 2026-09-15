@@ -306,8 +306,8 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Пакеты для USB-хранилища (fstab, NTFS, ext4, Samba4)" FontWeight="SemiBold" FontSize="15" />
-                                    <TextBlock Text="Установка block-mount, kmod-usb-storage, файловых систем ext4/NTFS3/vfat и сетевого файлообменника Samba4" 
+                                    <TextBlock Text="Пакеты для USB-хранилища (fstab, NTFS, exFAT, ext4, кириллица, Samba4)" FontWeight="SemiBold" FontSize="15" />
+                                    <TextBlock Text="Установка block-mount, usb-storage, файловых систем NTFS/exFAT/ext4/vfat, кодировок кириллицы UTF-8 (CP866, CP1251) и Samba4 (полный доступ 0777 root)" 
                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Margin="0,4,0,0" />
                                 </StackPanel>
                                 <ui:Button Grid.Column="1" Appearance="Primary" Icon="{ui:SymbolIcon ArrowDownload24}" 

@@ -15,7 +15,7 @@ public interface IUsbConfigService
     Task<UsbModemProfile> GetModemProfileAsync();
     Task<(bool Success, string Message)> SaveModemConfigAsync(UsbModemProfile profile);
     Task<(bool Success, string Message)> RestartModemInterfaceAsync(string interfaceName = "wwan");
-    Task<(bool Success, string Message)> MountDiskAsync(string deviceNode, string target);
+    Task<(bool Success, string Message)> MountDiskAsync(string deviceNode, string target, string? fileSystem = null);
     Task<(bool Success, string Message)> UnmountDiskAsync(string mountPointOrDevice);
     Task<(bool Success, string Message)> ConfigureSambaShareAsync(string path, string shareName = "USB_Storage");
     Task<(bool HasApk, bool HasOpkg, bool HasBlockMount, bool HasModemDrivers, bool HasStorageDrivers)> CheckPackagesStatusAsync();
@@ -313,17 +313,54 @@ public class UsbConfigService : IUsbConfigService
         return (false, $"Ошибка перезапуска интерфейса: {errMsg}");
     }
 
-    public async Task<(bool Success, string Message)> MountDiskAsync(string deviceNode, string target)
+    public async Task<(bool Success, string Message)> MountDiskAsync(string deviceNode, string target, string? fileSystem = null)
     {
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
 
-        var cmd = $"mkdir -p '{target}' && mount '{deviceNode}' '{target}'";
-        var (exitCode, _, errMsg) = await _ssh.ExecuteCommandAsync(cmd, 10);
+        var fs = fileSystem?.ToLowerInvariant() ?? "";
+        string mountCmd;
+
+        if (fs.Contains("exfat"))
+        {
+            mountCmd = $"mount -t exfat -o rw,noatime,iocharset=utf8,umask=000,dmask=0000,fmask=0000 '{deviceNode}' '{target}' 2>/dev/null || " +
+                       $"mount -o rw,noatime,iocharset=utf8,umask=000 '{deviceNode}' '{target}' 2>/dev/null || " +
+                       $"mount '{deviceNode}' '{target}'";
+        }
+        else if (fs.Contains("vfat") || fs.Contains("fat"))
+        {
+            // Windows FAT32 with Russian/Cyrillic support (CP866 + UTF-8) and full read/write permissions
+            mountCmd = $"mount -t vfat -o rw,noatime,iocharset=utf8,utf8=1,codepage=866,umask=000,dmask=0000,fmask=0000 '{deviceNode}' '{target}' 2>/dev/null || " +
+                       $"mount -o rw,noatime,iocharset=utf8,utf8=1,umask=000 '{deviceNode}' '{target}' 2>/dev/null || " +
+                       $"mount '{deviceNode}' '{target}'";
+        }
+        else if (fs.Contains("ntfs"))
+        {
+            // Windows NTFS with full UTF-8 and write permissions via ntfs-3g or kernel ntfs3 driver
+            mountCmd = $"ntfs-3g -o rw,noatime,big_writes,iocharset=utf8,umask=000 '{deviceNode}' '{target}' 2>/dev/null || " +
+                       $"mount -t ntfs3 -o rw,noatime,iocharset=utf8,umask=000,dmask=0000,fmask=0000 '{deviceNode}' '{target}' 2>/dev/null || " +
+                       $"mount -o rw,noatime,iocharset=utf8,umask=000 '{deviceNode}' '{target}' 2>/dev/null || " +
+                       $"mount '{deviceNode}' '{target}'";
+        }
+        else
+        {
+            // Generic mount with UTF-8 priority and full write access
+            mountCmd = $"mount -o rw,noatime,iocharset=utf8,utf8=1,umask=000 '{deviceNode}' '{target}' 2>/dev/null || " +
+                       $"mount -o rw,noatime,umask=000 '{deviceNode}' '{target}' 2>/dev/null || " +
+                       $"mount '{deviceNode}' '{target}'";
+        }
+
+        var fullCmd = $"mkdir -p '{target}' && ({mountCmd}) && (chmod 777 '{target}' 2>/dev/null || true)";
+        var (exitCode, _, errMsg) = await _ssh.ExecuteCommandAsync(fullCmd, 15);
         if (exitCode == 0)
         {
-            // Also update /etc/config/fstab for automount
-            await _ssh.ExecuteCommandAsync("block detect > /etc/config/fstab 2>/dev/null", 5);
-            return (true, $"Диск {deviceNode} успешно смонтирован в {target}");
+            // Also update /etc/config/fstab with UTF-8 and write permissions for automount on reboot
+            var fstabOpts = "rw,sync,noatime,iocharset=utf8,utf8=1,codepage=866,umask=000";
+            await _ssh.ExecuteCommandAsync(
+                "block detect > /etc/config/fstab 2>/dev/null; " +
+                $"uci set fstab.@mount[-1].options='{fstabOpts}' 2>/dev/null; " +
+                "uci commit fstab 2>/dev/null", 5);
+
+            return (true, $"Диск {deviceNode} успешно смонтирован в {target} (кириллица UTF-8 и полный доступ)");
         }
         return (false, $"Не удалось смонтировать: {errMsg}");
     }
@@ -348,22 +385,41 @@ public class UsbConfigService : IUsbConfigService
         var (checkExit, _, _) = await _ssh.ExecuteCommandAsync(checkCmd, 5);
         if (checkExit != 0)
         {
-            return (false, "Пакет Samba4 не установлен. Установите пакеты общего доступа через кнопку ниже.");
+            return (false, "Пакет Samba4 не установлен. Установите пакеты общего доступа через кнопку «Установить пакеты хранилища и Samba».");
         }
 
-        var cmd = "uci add samba4 sambashare >/dev/null 2>&1 || true && " +
-                  $"uci set samba4.@sambashare[-1].name='{shareName}' && " +
-                  $"uci set samba4.@sambashare[-1].path='{path}' && " +
-                  "uci set samba4.@sambashare[-1].read_only='no' && " +
-                  "uci set samba4.@sambashare[-1].guest_ok='yes' && " +
-                  "uci set samba4.@sambashare[-1].create_mask='0666' && " +
-                  "uci set samba4.@sambashare[-1].dir_mask='0777' && " +
-                  "uci commit samba4 && /etc/init.d/samba4 restart 2>/dev/null";
+        // Grant full permissions on directory
+        var prepareCmd = $"mkdir -p '{path}' && chmod 777 '{path}' 2>/dev/null || true";
+        await _ssh.ExecuteCommandAsync(prepareCmd, 5);
 
-        var (exitCode, _, errMsg) = await _ssh.ExecuteCommandAsync(cmd, 15);
+        // Check if existing share for this path already exists to avoid duplicates, and enforce force_user=root
+        var uciScript =
+            "EXISTING=$(uci show samba4 2>/dev/null | grep -E \"\\.path='?\"'" + path + "\"'?\" | cut -d. -f2 | head -n1); " +
+            "if [ -z \"$EXISTING\" ]; then " +
+            "  SECTION=$(uci add samba4 sambashare); " +
+            "else " +
+            "  SECTION=\"samba4.$EXISTING\"; " +
+            "fi; " +
+            $"uci set ${{SECTION}}.name='{shareName}'; " +
+            $"uci set ${{SECTION}}.path='{path}'; " +
+            "uci set ${SECTION}.read_only='no'; " +
+            "uci set ${SECTION}.guest_ok='yes'; " +
+            "uci set ${SECTION}.force_root='1'; " +
+            "uci set ${SECTION}.force_user='root'; " +
+            "uci set ${SECTION}.force_group='root'; " +
+            "uci set ${SECTION}.create_mask='0777'; " +
+            "uci set ${SECTION}.dir_mask='0777'; " +
+            "uci set ${SECTION}.force_create_mode='0777'; " +
+            "uci set ${SECTION}.force_directory_mode='0777'; " +
+            "uci set ${SECTION}.inherit_owner='yes'; " +
+            "uci commit samba4; " +
+            "/etc/init.d/samba4 enable 2>/dev/null; " +
+            "/etc/init.d/samba4 restart 2>/dev/null";
+
+        var (exitCode, _, errMsg) = await _ssh.ExecuteCommandAsync(uciScript, 15);
         if (exitCode == 0)
         {
-            return (true, $"Сетевой доступ Samba настроен для {path} (Имя: {shareName})");
+            return (true, $"Сетевой доступ Samba настроен для {path} (Имя: {shareName}, полный доступ root/guest без ограничений)");
         }
         return (false, $"Ошибка настройки Samba: {errMsg}");
     }
@@ -424,11 +480,11 @@ public class UsbConfigService : IUsbConfigService
         string cmd;
         if (status.HasApk)
         {
-            cmd = "apk update && apk add block-mount kmod-usb-storage kmod-fs-ext4 kmod-fs-ntfs3 kmod-fs-vfat e2fsprogs samba4-server";
+            cmd = "apk update && apk add block-mount kmod-usb-storage kmod-usb-storage-uas kmod-fs-ext4 kmod-fs-ntfs3 ntfs-3g kmod-fs-vfat kmod-fs-exfat kmod-nls-base kmod-nls-utf8 kmod-nls-cp866 kmod-nls-cp1251 kmod-nls-cp437 e2fsprogs samba4-server";
         }
         else if (status.HasOpkg)
         {
-            cmd = "opkg update && opkg install block-mount kmod-usb-storage kmod-fs-ext4 kmod-fs-ntfs3 kmod-fs-vfat e2fsprogs samba4-server";
+            cmd = "opkg update && opkg install block-mount kmod-usb-storage kmod-usb-storage-uas kmod-fs-ext4 kmod-fs-ntfs3 ntfs-3g kmod-fs-vfat kmod-fs-exfat kmod-nls-base kmod-nls-utf8 kmod-nls-cp866 kmod-nls-cp1251 kmod-nls-cp437 e2fsprogs samba4-server";
         }
         else
         {

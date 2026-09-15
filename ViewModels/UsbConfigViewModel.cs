@@ -193,7 +193,7 @@ public partial class UsbConfigViewModel : ObservableObject
         StatusMessage = $"Монтирование {disk.DeviceNode} в {target}...";
         try
         {
-            var (success, msg) = await _usbService.MountDiskAsync(disk.DeviceNode, target);
+            var (success, msg) = await _usbService.MountDiskAsync(disk.DeviceNode, target, disk.FileSystem);
             StatusMessage = msg;
             await LoadDataAsync();
         }

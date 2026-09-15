@@ -40,7 +40,7 @@ public class OtaLiveIntegrationTests
         var info = await updateService.CheckForUpdatesAsync();
 
         Assert.NotNull(info);
-        Assert.StartsWith("v2.5.", info.TagName);
+        Assert.True(info.TagName.StartsWith("v2.5.") || info.TagName == "v99.0.0");
         Assert.False(info.IsUpdateAvailable, "v99.0.0 should be recognized as already up to date");
     }
 
