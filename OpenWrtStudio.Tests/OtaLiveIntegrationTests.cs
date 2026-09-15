@@ -14,6 +14,11 @@ public class OtaLiveIntegrationTests
     {
         using var httpClient = new HttpClient();
         httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("OpenWrtStudio-OtaTest/2.5.0");
+        var token = Environment.GetEnvironmentVariable("GITHUB_TOKEN");
+        if (!string.IsNullOrEmpty(token))
+        {
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", $"token {token}");
+        }
 
         var v250 = new Version(2, 5, 0);
         var updateService = new UpdateService(httpClient, v250);
@@ -33,6 +38,11 @@ public class OtaLiveIntegrationTests
     {
         using var httpClient = new HttpClient();
         httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("OpenWrtStudio-OtaTest/3.0.0");
+        var token = Environment.GetEnvironmentVariable("GITHUB_TOKEN");
+        if (!string.IsNullOrEmpty(token))
+        {
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", $"token {token}");
+        }
 
         var vFuture = new Version(99, 0, 0);
         var updateService = new UpdateService(httpClient, vFuture);
@@ -49,22 +59,31 @@ public class OtaLiveIntegrationTests
     {
         using var httpClient = new HttpClient();
         httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("OpenWrtStudio-OtaTest/2.5.0");
+        var token = Environment.GetEnvironmentVariable("GITHUB_TOKEN");
+        if (!string.IsNullOrEmpty(token))
+        {
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", $"token {token}");
+        }
 
         var updateService = new UpdateService(httpClient, new Version(2, 5, 0));
         var info = await updateService.CheckForUpdatesAsync();
 
         Assert.NotNull(info.DownloadUrl);
 
-        // Test downloading the first 100 KB to verify connectivity and stream reading
+        // Test downloading the first 64 KB using a clean download client (AWS S3 rejects GitHub Auth header)
+        using var downloadClient = new HttpClient();
+        downloadClient.DefaultRequestHeaders.UserAgent.ParseAdd("OpenWrtStudio-Downloader/2.5.0");
         var req = new HttpRequestMessage(HttpMethod.Get, info.DownloadUrl);
         req.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 1024 * 64); // 64 KB
-        var resp = await httpClient.SendAsync(req);
+        var resp = await downloadClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
         Assert.True(resp.IsSuccessStatusCode);
 
-        var bytes = await resp.Content.ReadAsByteArrayAsync();
-        Assert.True(bytes.Length > 0);
+        using var stream = await resp.Content.ReadAsStreamAsync();
+        var buffer = new byte[2];
+        var read = await stream.ReadAsync(buffer.AsMemory(0, 2));
+        Assert.Equal(2, read);
         // Verify PE Header "MZ"
-        Assert.Equal((byte)'M', bytes[0]);
-        Assert.Equal((byte)'Z', bytes[1]);
+        Assert.Equal((byte)'M', buffer[0]);
+        Assert.Equal((byte)'Z', buffer[1]);
     }
 }

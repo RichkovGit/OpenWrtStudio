@@ -21,6 +21,7 @@ public interface IUsbConfigService
     Task<(bool HasApk, bool HasOpkg, bool HasBlockMount, bool HasModemDrivers, bool HasStorageDrivers)> CheckPackagesStatusAsync();
     Task<(bool Success, string Message)> InstallModemPackagesAsync();
     Task<(bool Success, string Message)> InstallStoragePackagesAsync();
+    Task<(bool Success, string Message)> EnsureHotplugAutomountScriptAsync();
 }
 
 public class UsbConfigService : IUsbConfigService
@@ -360,6 +361,9 @@ public class UsbConfigService : IUsbConfigService
                 $"uci set fstab.@mount[-1].options='{fstabOpts}' 2>/dev/null; " +
                 "uci commit fstab 2>/dev/null", 5);
 
+            // Install hotplug automount script for future insertions/removals
+            _ = EnsureHotplugAutomountScriptAsync();
+
             return (true, $"Диск {deviceNode} успешно смонтирован в {target} (кириллица UTF-8 и полный доступ)");
         }
         return (false, $"Не удалось смонтировать: {errMsg}");
@@ -494,8 +498,102 @@ public class UsbConfigService : IUsbConfigService
         var (exitCode, outMsg, errMsg) = await _ssh.ExecuteCommandAsync(cmd, 60);
         if (exitCode == 0)
         {
-            return (true, "Пакеты для USB-дисков и файлового хранилища успешно установлены");
+            await EnsureHotplugAutomountScriptAsync();
+            return (true, "Пакеты для USB-дисков и файлового хранилища успешно установлены, автомонтирование hotplug настроено");
         }
         return (false, $"Ошибка установки пакетов: {errMsg}\n{outMsg}");
+    }
+
+    public async Task<(bool Success, string Message)> EnsureHotplugAutomountScriptAsync()
+    {
+        if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
+
+        var hotplugScript =
+            "mkdir -p /etc/hotplug.d/block && " +
+            "cat << 'EOF' > /etc/hotplug.d/block/20-automount\n" +
+            "#!/bin/sh\n" +
+            "# /etc/hotplug.d/block/20-automount - Auto mount/unmount USB drives with Cyrillic & RW permissions\n" +
+            "case \"$ACTION\" in\n" +
+            "    add)\n" +
+            "        case \"$DEVNAME\" in\n" +
+            "            sd[a-z]*|hd[a-z]*|nvme*|mmcblk*)\n" +
+            "                ;;\n" +
+            "            *)\n" +
+            "                exit 0\n" +
+            "                ;;\n" +
+            "        esac\n" +
+            "        sleep 1\n" +
+            "        if [ -d \"/sys/block/$DEVNAME\" ] && ls /sys/block/$DEVNAME/${DEVNAME}[0-9]* >/dev/null 2>&1; then\n" +
+            "            exit 0\n" +
+            "        fi\n" +
+            "        MOUNT_POINT=\"/mnt/$DEVNAME\"\n" +
+            "        mkdir -p \"$MOUNT_POINT\"\n" +
+            "        FSTYPE=$(blkid \"/dev/$DEVNAME\" 2>/dev/null | grep -o 'TYPE=\"[^\"]*\"' | cut -d'\"' -f2)\n" +
+            "        if [ -z \"$FSTYPE\" ]; then\n" +
+            "            FSTYPE=$(block info \"/dev/$DEVNAME\" 2>/dev/null | grep -o 'TYPE=\"[^\"]*\"' | cut -d'\"' -f2)\n" +
+            "        fi\n" +
+            "        MOUNTED=0\n" +
+            "        case \"$FSTYPE\" in\n" +
+            "            *exfat*|*EXFAT*)\n" +
+            "                mount -t exfat -o rw,noatime,iocharset=utf8,umask=000,dmask=0000,fmask=0000 \"/dev/$DEVNAME\" \"$MOUNT_POINT\" 2>/dev/null || \\\n" +
+            "                mount -o rw,noatime,iocharset=utf8,umask=000 \"/dev/$DEVNAME\" \"$MOUNT_POINT\" 2>/dev/null || \\\n" +
+            "                mount \"/dev/$DEVNAME\" \"$MOUNT_POINT\" 2>/dev/null\n" +
+            "                MOUNTED=$?\n" +
+            "                ;;\n" +
+            "            *vfat*|*fat*|*FAT*)\n" +
+            "                mount -t vfat -o rw,noatime,iocharset=utf8,utf8=1,codepage=866,umask=000,dmask=0000,fmask=0000 \"/dev/$DEVNAME\" \"$MOUNT_POINT\" 2>/dev/null || \\\n" +
+            "                mount -o rw,noatime,iocharset=utf8,utf8=1,umask=000 \"/dev/$DEVNAME\" \"$MOUNT_POINT\" 2>/dev/null || \\\n" +
+            "                mount \"/dev/$DEVNAME\" \"$MOUNT_POINT\" 2>/dev/null\n" +
+            "                MOUNTED=$?\n" +
+            "                ;;\n" +
+            "            *ntfs*|*NTFS*)\n" +
+            "                ntfs-3g -o rw,noatime,big_writes,iocharset=utf8,umask=000 \"/dev/$DEVNAME\" \"$MOUNT_POINT\" 2>/dev/null || \\\n" +
+            "                mount -t ntfs3 -o rw,noatime,iocharset=utf8,umask=000,dmask=0000,fmask=0000 \"/dev/$DEVNAME\" \"$MOUNT_POINT\" 2>/dev/null || \\\n" +
+            "                mount -o rw,noatime,iocharset=utf8,umask=000 \"/dev/$DEVNAME\" \"$MOUNT_POINT\" 2>/dev/null || \\\n" +
+            "                mount \"/dev/$DEVNAME\" \"$MOUNT_POINT\" 2>/dev/null\n" +
+            "                MOUNTED=$?\n" +
+            "                ;;\n" +
+            "            *ext4*|*ext3*|*ext2*)\n" +
+            "                mount -t \"$FSTYPE\" -o rw,noatime \"/dev/$DEVNAME\" \"$MOUNT_POINT\" 2>/dev/null || \\\n" +
+            "                mount \"/dev/$DEVNAME\" \"$MOUNT_POINT\" 2>/dev/null\n" +
+            "                MOUNTED=$?\n" +
+            "                ;;\n" +
+            "            *)\n" +
+            "                mount -t exfat -o rw,noatime,iocharset=utf8,umask=000 \"/dev/$DEVNAME\" \"$MOUNT_POINT\" 2>/dev/null || \\\n" +
+            "                mount -t vfat -o rw,noatime,iocharset=utf8,utf8=1,codepage=866,umask=000 \"/dev/$DEVNAME\" \"$MOUNT_POINT\" 2>/dev/null || \\\n" +
+            "                ntfs-3g -o rw,noatime,big_writes,iocharset=utf8,umask=000 \"/dev/$DEVNAME\" \"$MOUNT_POINT\" 2>/dev/null || \\\n" +
+            "                mount -t ntfs3 -o rw,noatime,iocharset=utf8,umask=000 \"/dev/$DEVNAME\" \"$MOUNT_POINT\" 2>/dev/null || \\\n" +
+            "                mount -o rw,noatime,iocharset=utf8,umask=000 \"/dev/$DEVNAME\" \"$MOUNT_POINT\" 2>/dev/null || \\\n" +
+            "                mount \"/dev/$DEVNAME\" \"$MOUNT_POINT\" 2>/dev/null\n" +
+            "                MOUNTED=$?\n" +
+            "                ;;\n" +
+            "        esac\n" +
+            "        if [ \"$MOUNTED\" -eq 0 ]; then\n" +
+            "            chmod 777 \"$MOUNT_POINT\" 2>/dev/null || true\n" +
+            "            if [ -f /etc/init.d/samba4 ]; then\n" +
+            "                /etc/init.d/samba4 reload 2>/dev/null || /etc/init.d/samba4 restart 2>/dev/null || true\n" +
+            "            fi\n" +
+            "        fi\n" +
+            "        ;;\n" +
+            "    remove)\n" +
+            "        MOUNT_POINT=\"/mnt/$DEVNAME\"\n" +
+            "        if grep -qs \"$MOUNT_POINT\" /proc/mounts; then\n" +
+            "            umount -l \"$MOUNT_POINT\" 2>/dev/null || true\n" +
+            "        fi\n" +
+            "        rmdir \"$MOUNT_POINT\" 2>/dev/null || true\n" +
+            "        ;;\n" +
+            "esac\n" +
+            "EOF\n" +
+            "chmod +x /etc/hotplug.d/block/20-automount 2>/dev/null; " +
+            "[ ! -f /etc/config/fstab ] && touch /etc/config/fstab; " +
+            "if ! uci get fstab.@global[0] >/dev/null 2>&1; then uci add fstab global >/dev/null 2>&1; fi; " +
+            "uci set fstab.@global[0].anon_mount='1' 2>/dev/null; " +
+            "uci set fstab.@global[0].auto_mount='1' 2>/dev/null; " +
+            "uci commit fstab 2>/dev/null";
+
+        var (exitCode, _, err) = await _ssh.ExecuteCommandAsync(hotplugScript, 10);
+        return exitCode == 0
+            ? (true, "Скрипт автомонтирования hotplug успешно установлен в /etc/hotplug.d/block/20-automount")
+            : (false, $"Ошибка установки hotplug скрипта: {err}");
     }
 }

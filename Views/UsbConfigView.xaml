@@ -310,8 +310,13 @@
                                     <TextBlock Text="Установка block-mount, usb-storage, файловых систем NTFS/exFAT/ext4/vfat, кодировок кириллицы UTF-8 (CP866, CP1251) и Samba4 (полный доступ 0777 root)" 
                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Margin="0,4,0,0" />
                                 </StackPanel>
-                                <ui:Button Grid.Column="1" Appearance="Primary" Icon="{ui:SymbolIcon ArrowDownload24}" 
-                                           Content="Установить пакеты хранилища" Command="{Binding InstallStorageDriversCommand}" VerticalAlignment="Center" Margin="16,0,0,0" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                                    <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon Flash24}" 
+                                               Content="Включить Hotplug" ToolTipService.ToolTip="Установка скрипта автоматического монтирования при подключении флешки (/etc/hotplug.d/block/20-automount)"
+                                               Command="{Binding SetupHotplugAutomountCommand}" Margin="0,0,8,0" />
+                                    <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon ArrowDownload24}" 
+                                               Content="Установить пакеты хранилища" Command="{Binding InstallStorageDriversCommand}" />
+                                </StackPanel>
                             </Grid>
                         </ui:Card>
                     </StackPanel>

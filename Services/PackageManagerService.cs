@@ -23,15 +23,32 @@ public interface IPackageManagerService
 public class PackageManagerService : IPackageManagerService
 {
     private readonly ISshService _ssh;
+    private string? _detectedPm;
 
     public PackageManagerService(ISshService ssh)
     {
         _ssh = ssh;
     }
 
+    public async Task<string> DetectPackageManagerAsync()
+    {
+        if (_detectedPm != null && _ssh.IsConnected) return _detectedPm;
+
+        var (code, outStr, _) = await _ssh.ExecuteCommandAsync(
+            "if command -v apk >/dev/null 2>&1; then echo 'apk'; elif command -v opkg >/dev/null 2>&1; then echo 'opkg'; else echo 'none'; fi", 5);
+        var res = outStr?.Trim().ToLowerInvariant() ?? "";
+        if (res.Contains("apk")) _detectedPm = "apk";
+        else if (res.Contains("opkg")) _detectedPm = "opkg";
+        else _detectedPm = "opkg";
+
+        return _detectedPm;
+    }
+
     public async Task<(bool Success, string Output)> UpdateListsAsync()
     {
-        var (code, outStr, err) = await _ssh.ExecuteCommandAsync("opkg update", 45);
+        var pm = await DetectPackageManagerAsync();
+        var cmd = pm == "apk" ? "apk update" : "opkg update";
+        var (code, outStr, err) = await _ssh.ExecuteCommandAsync(cmd, 45);
         return code == 0
             ? (true, outStr)
             : (false, string.IsNullOrWhiteSpace(err) ? outStr : err);
@@ -40,22 +57,52 @@ public class PackageManagerService : IPackageManagerService
     public async Task<List<PackageItem>> GetInstalledPackagesAsync()
     {
         var list = new List<PackageItem>();
-        var (code, outStr, _) = await _ssh.ExecuteCommandAsync("opkg list-installed", 15);
-        if (code != 0 || string.IsNullOrWhiteSpace(outStr)) return list;
+        var pm = await DetectPackageManagerAsync();
 
-        foreach (var line in outStr.Split('\n'))
+        if (pm == "apk")
         {
-            var parts = line.Split(" - ", StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 2)
+            var (code, outStr, _) = await _ssh.ExecuteCommandAsync("apk info -v", 15);
+            if (code != 0 || string.IsNullOrWhiteSpace(outStr)) return list;
+
+            var versionPattern = new Regex(@"^(.+?)-([0-9].*)$");
+            foreach (var line in outStr.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
+                var trimmed = line.Trim();
+                if (string.IsNullOrEmpty(trimmed)) continue;
+
+                var match = versionPattern.Match(trimmed);
+                var name = match.Success ? match.Groups[1].Value : trimmed;
+                var version = match.Success ? match.Groups[2].Value : "";
+
                 list.Add(new PackageItem
                 {
-                    Name = parts[0].Trim(),
-                    Version = parts[1].Trim(),
-                    InstalledVersion = parts[1].Trim(),
+                    Name = name,
+                    Version = version,
+                    InstalledVersion = version,
                     IsInstalled = true,
-                    Category = DetermineCategory(parts[0].Trim())
+                    Category = DetermineCategory(name)
                 });
+            }
+        }
+        else
+        {
+            var (code, outStr, _) = await _ssh.ExecuteCommandAsync("opkg list-installed", 15);
+            if (code != 0 || string.IsNullOrWhiteSpace(outStr)) return list;
+
+            foreach (var line in outStr.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = line.Split(" - ", StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 2)
+                {
+                    list.Add(new PackageItem
+                    {
+                        Name = parts[0].Trim(),
+                        Version = parts[1].Trim(),
+                        InstalledVersion = parts[1].Trim(),
+                        IsInstalled = true,
+                        Category = DetermineCategory(parts[0].Trim())
+                    });
+                }
             }
         }
         return list;
@@ -67,17 +114,27 @@ public class PackageManagerService : IPackageManagerService
         if (string.IsNullOrWhiteSpace(query)) return list;
 
         var safeQuery = Regex.Replace(query, @"[^a-zA-Z0-9_\-\.]", "");
-        var (code, outStr, _) = await _ssh.ExecuteCommandAsync($"opkg list | grep -i '{safeQuery}' | head -n 100", 15);
-        if (code != 0 || string.IsNullOrWhiteSpace(outStr)) return list;
+        var pm = await DetectPackageManagerAsync();
 
-        foreach (var line in outStr.Split('\n'))
+        if (pm == "apk")
         {
-            var parts = line.Split(" - ", StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 2)
+            var (code, outStr, _) = await _ssh.ExecuteCommandAsync($"apk search -v '{safeQuery}' 2>/dev/null | head -n 100", 15);
+            if (code != 0 || string.IsNullOrWhiteSpace(outStr)) return list;
+
+            var versionPattern = new Regex(@"^(.+?)-([0-9].*)$");
+            foreach (var line in outStr.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
-                var name = parts[0].Trim();
-                var version = parts[1].Trim();
-                var desc = parts.Length >= 3 ? parts[2].Trim() : "";
+                var trimmed = line.Trim();
+                if (string.IsNullOrEmpty(trimmed)) continue;
+
+                // Format: pkg-1.2.3 - Description or pkg-1.2.3
+                var parts = trimmed.Split(" - ", StringSplitOptions.RemoveEmptyEntries);
+                var pkgWithVer = parts[0].Trim();
+                var desc = parts.Length > 1 ? string.Join(" - ", parts.Skip(1)).Trim() : "";
+
+                var match = versionPattern.Match(pkgWithVer);
+                var name = match.Success ? match.Groups[1].Value : pkgWithVer;
+                var version = match.Success ? match.Groups[2].Value : "";
 
                 list.Add(new PackageItem
                 {
@@ -88,16 +145,63 @@ public class PackageManagerService : IPackageManagerService
                 });
             }
         }
+        else
+        {
+            var (code, outStr, _) = await _ssh.ExecuteCommandAsync($"opkg list | grep -i '{safeQuery}' | head -n 100", 15);
+            if (code != 0 || string.IsNullOrWhiteSpace(outStr)) return list;
+
+            foreach (var line in outStr.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = line.Split(" - ", StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 2)
+                {
+                    var name = parts[0].Trim();
+                    var version = parts[1].Trim();
+                    var desc = parts.Length >= 3 ? parts[2].Trim() : "";
+
+                    list.Add(new PackageItem
+                    {
+                        Name = name,
+                        Version = version,
+                        Description = desc,
+                        Category = DetermineCategory(name)
+                    });
+                }
+            }
+        }
         return list;
     }
 
     public async Task<(bool Success, string Output)> InstallPackageAsync(string name, string? customInstallCmd = null)
     {
-        var cmd = !string.IsNullOrWhiteSpace(customInstallCmd)
-            ? customInstallCmd
-            : $"opkg install {name}";
+        var pm = await DetectPackageManagerAsync();
+        string cmd;
 
-        var (code, outStr, err) = await _ssh.ExecuteCommandAsync(cmd, 60);
+        if (pm == "apk")
+        {
+            if (!string.IsNullOrWhiteSpace(customInstallCmd))
+            {
+                // Translate opkg commands to apk equivalents
+                cmd = customInstallCmd
+                    .Replace("opkg install --force-depends", "apk add")
+                    .Replace("opkg install", "apk add")
+                    .Replace("opkg update", "apk update")
+                    .Replace("opkg remove --autoremove", "apk del")
+                    .Replace("opkg remove", "apk del");
+            }
+            else
+            {
+                cmd = $"apk add {name}";
+            }
+        }
+        else
+        {
+            cmd = !string.IsNullOrWhiteSpace(customInstallCmd)
+                ? customInstallCmd
+                : $"opkg install {name}";
+        }
+
+        var (code, outStr, err) = await _ssh.ExecuteCommandAsync(cmd, 90);
         return code == 0
             ? (true, outStr)
             : (false, string.IsNullOrWhiteSpace(err) ? outStr : err);
@@ -105,7 +209,9 @@ public class PackageManagerService : IPackageManagerService
 
     public async Task<(bool Success, string Output)> RemovePackageAsync(string name)
     {
-        var (code, outStr, err) = await _ssh.ExecuteCommandAsync($"opkg remove {name} --autoremove", 40);
+        var pm = await DetectPackageManagerAsync();
+        var cmd = pm == "apk" ? $"apk del {name}" : $"opkg remove {name} --autoremove";
+        var (code, outStr, err) = await _ssh.ExecuteCommandAsync(cmd, 40);
         return code == 0
             ? (true, outStr)
             : (false, string.IsNullOrWhiteSpace(err) ? outStr : err);
@@ -118,25 +224,14 @@ public class PackageManagerService : IPackageManagerService
         // Check which ones are already installed
         try
         {
-            var (code, outStr, _) = await _ssh.ExecuteCommandAsync("opkg list-installed", 10);
-            if (code == 0 && !string.IsNullOrWhiteSpace(outStr))
-            {
-                var installedMap = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var line in outStr.Split('\n'))
-                {
-                    var parts = line.Split(" - ");
-                    if (parts.Length > 0)
-                    {
-                        installedMap.Add(parts[0].Trim());
-                    }
-                }
+            var installed = await GetInstalledPackagesAsync();
+            var installedMap = new HashSet<string>(installed.Select(p => p.Name), StringComparer.OrdinalIgnoreCase);
 
-                foreach (var item in curated)
+            foreach (var item in curated)
+            {
+                if (installedMap.Contains(item.Name))
                 {
-                    if (installedMap.Contains(item.Name))
-                    {
-                        item.IsInstalled = true;
-                    }
+                    item.IsInstalled = true;
                 }
             }
         }
@@ -292,27 +387,73 @@ public class PackageManagerService : IPackageManagerService
     public async Task<List<CustomFeed>> GetCustomFeedsAsync()
     {
         var feeds = new List<CustomFeed>();
-        var (code, outStr, _) = await _ssh.ExecuteCommandAsync("cat /etc/opkg/customfeeds.conf 2>/dev/null", 5);
-        if (code == 0 && !string.IsNullOrWhiteSpace(outStr))
+        var pm = await DetectPackageManagerAsync();
+
+        if (pm == "apk")
         {
-            foreach (var line in outStr.Split('\n'))
+            var (code, outStr, _) = await _ssh.ExecuteCommandAsync("cat /etc/apk/repositories.d/customfeeds.list /etc/apk/repositories 2>/dev/null", 5);
+            if (code == 0 && !string.IsNullOrWhiteSpace(outStr))
             {
-                var trimmed = line.Trim();
-                if (string.IsNullOrWhiteSpace(trimmed)) continue;
-
-                var isEnabled = !trimmed.StartsWith("#");
-                var cleanLine = trimmed.TrimStart('#', ' ');
-
-                var m = Regex.Match(cleanLine, @"^src/gz\s+([^\s]+)\s+(https?://[^\s]+)");
-                if (m.Success)
+                foreach (var line in outStr.Split('\n'))
                 {
-                    feeds.Add(new CustomFeed
+                    var trimmed = line.Trim();
+                    if (string.IsNullOrWhiteSpace(trimmed)) continue;
+
+                    var isEnabled = !trimmed.StartsWith("#");
+                    var cleanLine = trimmed.TrimStart('#', ' ');
+
+                    if (cleanLine.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || cleanLine.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
                     {
-                        Name = m.Groups[1].Value,
-                        Url = m.Groups[2].Value,
-                        IsEnabled = isEnabled,
-                        Description = "Пользовательский репозиторий"
-                    });
+                        var feedName = "custom_feed";
+                        try
+                        {
+                            var uri = new Uri(cleanLine);
+                            feedName = uri.Segments.Length > 0 ? uri.Segments[^1].Trim('/') : "custom_feed";
+                            if (string.IsNullOrEmpty(feedName) || feedName == "packages.adb")
+                            {
+                                feedName = uri.Host;
+                            }
+                        }
+                        catch
+                        {
+                            // ignore url parse error
+                        }
+
+                        feeds.Add(new CustomFeed
+                        {
+                            Name = feedName,
+                            Url = cleanLine,
+                            IsEnabled = isEnabled,
+                            Description = "Пользовательский репозиторий apk"
+                        });
+                    }
+                }
+            }
+        }
+        else
+        {
+            var (code, outStr, _) = await _ssh.ExecuteCommandAsync("cat /etc/opkg/customfeeds.conf 2>/dev/null", 5);
+            if (code == 0 && !string.IsNullOrWhiteSpace(outStr))
+            {
+                foreach (var line in outStr.Split('\n'))
+                {
+                    var trimmed = line.Trim();
+                    if (string.IsNullOrWhiteSpace(trimmed)) continue;
+
+                    var isEnabled = !trimmed.StartsWith("#");
+                    var cleanLine = trimmed.TrimStart('#', ' ');
+
+                    var m = Regex.Match(cleanLine, @"^src/gz\s+([^\s]+)\s+(https?://[^\s]+)");
+                    if (m.Success)
+                    {
+                        feeds.Add(new CustomFeed
+                        {
+                            Name = m.Groups[1].Value,
+                            Url = m.Groups[2].Value,
+                            IsEnabled = isEnabled,
+                            Description = "Пользовательский репозиторий"
+                        });
+                    }
                 }
             }
         }
@@ -348,8 +489,18 @@ public class PackageManagerService : IPackageManagerService
 
     public async Task<(bool Success, string Message)> AddCustomFeedAsync(CustomFeed feed)
     {
-        var line = $"src/gz {feed.Name} {feed.Url}\n";
-        var appendCmd = $"echo '{line.Trim()}' >> /etc/opkg/customfeeds.conf";
+        var pm = await DetectPackageManagerAsync();
+        string appendCmd;
+        if (pm == "apk")
+        {
+            appendCmd = $"mkdir -p /etc/apk/repositories.d && echo '{feed.Url.Trim()}' >> /etc/apk/repositories.d/customfeeds.list";
+        }
+        else
+        {
+            var line = $"src/gz {feed.Name} {feed.Url}\n";
+            appendCmd = $"mkdir -p /etc/opkg && echo '{line.Trim()}' >> /etc/opkg/customfeeds.conf";
+        }
+
         var (code, _, err) = await _ssh.ExecuteCommandAsync(appendCmd, 10);
         return code == 0
             ? (true, $"Репозиторий {feed.Name} успешно добавлен!")
@@ -358,7 +509,17 @@ public class PackageManagerService : IPackageManagerService
 
     public async Task<(bool Success, string Message)> RemoveCustomFeedAsync(string feedName)
     {
-        var sedCmd = $"sed -i '/{feedName}/d' /etc/opkg/customfeeds.conf";
+        var pm = await DetectPackageManagerAsync();
+        string sedCmd;
+        if (pm == "apk")
+        {
+            sedCmd = $"sed -i '/{feedName}/d' /etc/apk/repositories.d/customfeeds.list 2>/dev/null || sed -i '/{feedName}/d' /etc/apk/repositories 2>/dev/null";
+        }
+        else
+        {
+            sedCmd = $"sed -i '/{feedName}/d' /etc/opkg/customfeeds.conf";
+        }
+
         var (code, _, err) = await _ssh.ExecuteCommandAsync(sedCmd, 10);
         return code == 0
             ? (true, $"Репозиторий {feedName} удален.")

@@ -299,4 +299,25 @@ public partial class UsbConfigViewModel : ObservableObject
             IsLoading = false;
         }
     }
+
+    [RelayCommand]
+    public async Task SetupHotplugAutomountAsync()
+    {
+        IsLoading = true;
+        StatusMessage = "Настройка скрипта горячего подключения /etc/hotplug.d/block/20-automount...";
+        try
+        {
+            var (success, msg) = await _usbService.EnsureHotplugAutomountScriptAsync();
+            StatusMessage = msg;
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Ошибка: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
 }

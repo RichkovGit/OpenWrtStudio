@@ -111,6 +111,7 @@ public class SymbolValidationTests
             Assert.Equal("TestPassword123!", profile.Password);
         });
         thread.SetApartmentState(System.Threading.ApartmentState.STA);
+        thread.IsBackground = true;
         thread.Start();
         thread.Join();
     }

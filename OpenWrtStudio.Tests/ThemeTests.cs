@@ -96,7 +96,7 @@ public class ThemeTests
     [Fact]
     public void ThemeService_ApplyTheme_LightModeSetsLightBrushes()
     {
-        if (Application.Current == null) new Application();
+        if (Application.Current == null) new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
 
         var service = new ThemeService();
         service.ApplyTheme("amber", false);
@@ -120,7 +120,7 @@ public class ThemeTests
     [Fact]
     public void ThemeService_ApplyTheme_DarkModeSetsDarkBrushes()
     {
-        if (Application.Current == null) new Application();
+        if (Application.Current == null) new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
 
         var service = new ThemeService();
         service.ApplyTheme("cyan", true);

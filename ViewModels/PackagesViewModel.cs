@@ -85,7 +85,7 @@ public partial class PackagesViewModel : ObservableObject
         if (!_ssh.IsConnected) return;
 
         IsUpdating = true;
-        StatusMessage = "Выполняется 'opkg update', загрузка свежих индексов...";
+        StatusMessage = "Выполняется обновление списков пакетов (apk / opkg)...";
         var (success, outStr) = await _pkgService.UpdateListsAsync();
         IsUpdating = false;
 

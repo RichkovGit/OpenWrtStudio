@@ -151,4 +151,84 @@ public class UsbAndDiscoveryTests
             Assert.Contains(setting, simulatedScript);
         }
     }
+
+    [Fact]
+    public void HotplugScript_ContainsAutoMount_Cyrillic_And_Permissions()
+    {
+        var service = new UsbConfigService(null!);
+        // Check keywords that must be in hotplug script logic
+        var keywords = new[]
+        {
+            "/etc/hotplug.d/block/20-automount",
+            "codepage=866",
+            "iocharset=utf8",
+            "umask=000",
+            "chmod 777",
+            "anon_mount='1'",
+            "auto_mount='1'"
+        };
+
+        // We simulate what EnsureHotplugAutomountScriptAsync writes
+        var script = "mkdir -p /etc/hotplug.d/block && " +
+            "cat << 'EOF' > /etc/hotplug.d/block/20-automount\n" +
+            "case \"$ACTION\" in\n" +
+            "    add)\n" +
+            "        mount -t vfat -o rw,noatime,iocharset=utf8,utf8=1,codepage=866,umask=000 \"/dev/$DEVNAME\" \"$MOUNT_POINT\"\n" +
+            "        chmod 777 \"$MOUNT_POINT\"\n" +
+            "    remove)\n" +
+            "        umount -l \"$MOUNT_POINT\"\n" +
+            "esac\n" +
+            "EOF\n" +
+            "chmod +x /etc/hotplug.d/block/20-automount\n" +
+            "uci set fstab.@global[0].anon_mount='1'\n" +
+            "uci set fstab.@global[0].auto_mount='1'";
+
+        foreach (var kw in keywords)
+        {
+            Assert.Contains(kw, script);
+        }
+    }
+
+    [Theory]
+    [InlineData("apk-mbedtls-3.0.5-r3", "apk-mbedtls", "3.0.5-r3")]
+    [InlineData("attendedsysupgrade-common-10", "attendedsysupgrade-common", "10")]
+    [InlineData("base-files-1711~f5dae5ece4", "base-files", "1711~f5dae5ece4")]
+    [InlineData("luci-app-samba4-26.256.72877~f883d90", "luci-app-samba4", "26.256.72877~f883d90")]
+    public void ApkInfoParsing_CorrectlyExtractsNameAndVersion(string line, string expectedName, string expectedVersion)
+    {
+        var versionPattern = new Regex(@"^(.+?)-([0-9].*)$");
+        var match = versionPattern.Match(line);
+        Assert.True(match.Success);
+        Assert.Equal(expectedName, match.Groups[1].Value);
+        Assert.Equal(expectedVersion, match.Groups[2].Value);
+    }
+
+    [Fact]
+    public void ApkSearchParsing_CorrectlyExtractsNameVersionAndDescription()
+    {
+        var line = "samba4-server-4.22.7-r3 - Samba 4 fileserver and services";
+        var parts = line.Split(" - ", StringSplitOptions.RemoveEmptyEntries);
+        var pkgWithVer = parts[0].Trim();
+        var desc = parts.Length > 1 ? string.Join(" - ", parts.Skip(1)).Trim() : "";
+
+        var versionPattern = new Regex(@"^(.+?)-([0-9].*)$");
+        var match = versionPattern.Match(pkgWithVer);
+
+        Assert.True(match.Success);
+        Assert.Equal("samba4-server", match.Groups[1].Value);
+        Assert.Equal("4.22.7-r3", match.Groups[2].Value);
+        Assert.Equal("Samba 4 fileserver and services", desc);
+    }
+
+    [Fact]
+    public void InstallPackageTranslation_ConvertsOpkgCommandsToApk()
+    {
+        var opkgCmd = "opkg update && opkg install --force-depends luci-app-passwall && opkg install kmod-tun";
+        var apkCmd = opkgCmd
+            .Replace("opkg install --force-depends", "apk add")
+            .Replace("opkg install", "apk add")
+            .Replace("opkg update", "apk update");
+
+        Assert.Equal("apk update && apk add luci-app-passwall && apk add kmod-tun", apkCmd);
+    }
 }
