@@ -45,6 +45,8 @@ public partial class App : Application
         services.AddSingleton<IUpdateService, UpdateService>();
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IClientManagerService, ClientManagerService>();
+        services.AddSingleton<IUsbConfigService, UsbConfigService>();
+        services.AddSingleton<IRouterDiscoveryService, RouterDiscoveryService>();
 
         // ViewModels
         services.AddSingleton<DashboardViewModel>();
@@ -57,6 +59,7 @@ public partial class App : Application
         services.AddSingleton<DiagnosticsViewModel>();
         services.AddSingleton<PackagesViewModel>();
         services.AddSingleton<SettingsViewModel>();
+        services.AddSingleton<UsbConfigViewModel>();
         services.AddSingleton<MainViewModel>();
 
         // Views

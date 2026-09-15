@@ -1,33 +1,41 @@
 using System.Collections.Generic;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace OpenWrtStudio.Models;
 
-public class AmneziaWgConfig
+public partial class AmneziaWgConfig : ObservableObject
 {
-    public string InterfaceName { get; set; } = "awg0";
-    public string PrivateKey { get; set; } = "";
-    public string Address { get; set; } = "10.8.0.2/24";
-    public int ListenPort { get; set; } = 51820;
-    public string Dns { get; set; } = "1.1.1.1, 8.8.8.8";
-    public int Mtu { get; set; } = 1420;
+    [ObservableProperty] private string _interfaceName = "awg0";
+    [ObservableProperty] private string _privateKey = "";
+    [ObservableProperty] private string _address = "10.8.0.2/24";
+    [ObservableProperty] private int _listenPort = 51820;
+    [ObservableProperty] private string _dns = "1.1.1.1, 8.8.8.8";
+    [ObservableProperty] private int _mtu = 1420;
 
-    // AmneziaWG Specific Obfuscation Parameters
-    public int Jc { get; set; } = 4;        // Junk packet count
-    public int Jmin { get; set; } = 40;     // Junk packet min size
-    public int Jmax { get; set; } = 70;     // Junk packet max size
-    public int S1 { get; set; } = 15;       // Init packet junk size
-    public int S2 { get; set; } = 25;       // Response packet junk size
-    public uint H1 { get; set; } = 1;       // Init packet header
-    public uint H2 { get; set; } = 2;       // Response packet header
-    public uint H3 { get; set; } = 3;       // Underload packet header
-    public uint H4 { get; set; } = 4;       // Transport packet header
+    // AmneziaWG Specific Obfuscation Parameters (0 = disabled / standard WireGuard)
+    [ObservableProperty] private int _jc = 0;        // Junk packet count
+    [ObservableProperty] private int _jmin = 0;     // Junk packet min size
+    [ObservableProperty] private int _jmax = 0;     // Junk packet max size
+    [ObservableProperty] private int _s1 = 0;       // Init packet junk size
+    [ObservableProperty] private int _s2 = 0;       // Response packet junk size
+    [ObservableProperty] private uint _h1 = 0;       // Init packet header
+    [ObservableProperty] private uint _h2 = 0;       // Response packet header
+    [ObservableProperty] private uint _h3 = 0;       // Underload packet header
+    [ObservableProperty] private uint _h4 = 0;       // Transport packet header
 
     // Peer
-    public string PeerPublicKey { get; set; } = "";
-    public string PeerPresharedKey { get; set; } = "";
-    public string Endpoint { get; set; } = ""; // host:port
-    public string AllowedIPs { get; set; } = "0.0.0.0/0, ::/0";
-    public int PersistentKeepalive { get; set; } = 25;
+    [ObservableProperty] private string _peerPublicKey = "";
+    [ObservableProperty] private string _peerPresharedKey = "";
+    [ObservableProperty] private string _endpoint = ""; // host:port
+    [ObservableProperty] private string _allowedIPs = "0.0.0.0/0, ::/0";
+    [ObservableProperty] private int _persistentKeepalive = 25;
+
+    // Status & Runtime
+    [ObservableProperty] private bool _isActive = false;
+    [ObservableProperty] private string _statusText = "Не активен";
+    [ObservableProperty] private string _transferRx = "0 B";
+    [ObservableProperty] private string _transferTx = "0 B";
+    [ObservableProperty] private string _latestHandshake = "Нет";
 }
 
 public class SingboxQuickConfig

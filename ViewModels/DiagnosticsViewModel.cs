@@ -36,6 +36,21 @@ public partial class DiagnosticsViewModel : ObservableObject
     private int _pingCount = 5;
 
     [ObservableProperty]
+    private string _selectedPingCountPreset = "5";
+
+    [ObservableProperty]
+    private ObservableCollection<string> _availableInterfaces = new() { "По умолчанию (Авто)" };
+
+    [ObservableProperty]
+    private string _selectedInterface = "По умолчанию (Авто)";
+
+    [ObservableProperty]
+    private int _packetSize = 56;
+
+    [ObservableProperty]
+    private string _extraPingArgs = "";
+
+    [ObservableProperty]
     private ObservableCollection<PingResultItem> _pingResults = new();
 
     [ObservableProperty]
@@ -84,6 +99,47 @@ public partial class DiagnosticsViewModel : ObservableObject
     {
         _diagService = diagService;
         _ssh = ssh;
+        _ssh.ConnectionChanged += (s, connected) =>
+        {
+            if (connected)
+            {
+                _ = LoadAvailableInterfacesAsync();
+            }
+        };
+    }
+
+    partial void OnSelectedPingCountPresetChanged(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return;
+        var clean = value.Trim();
+        if (clean.Contains("∞") || clean.Contains("Бесконечно") || clean == "0")
+        {
+            PingCount = 0;
+        }
+        else
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(clean, @"\d+");
+            if (match.Success && int.TryParse(match.Value, out var n))
+            {
+                PingCount = n;
+            }
+        }
+    }
+
+    [RelayCommand]
+    public async Task LoadAvailableInterfacesAsync()
+    {
+        if (!_ssh.IsConnected) return;
+        try
+        {
+            var list = await _diagService.GetNetworkInterfacesAsync();
+            AvailableInterfaces = new ObservableCollection<string>(list);
+            if (!AvailableInterfaces.Contains(SelectedInterface))
+            {
+                SelectedInterface = AvailableInterfaces.FirstOrDefault() ?? "По умолчанию (Авто)";
+            }
+        }
+        catch { }
     }
 
     [RelayCommand]
@@ -94,6 +150,7 @@ public partial class DiagnosticsViewModel : ObservableObject
         IsAuditing = true;
         AuditSummary = "Выполняется диагностика компонентов роутера, сети и служб...";
         HealthItems.Clear();
+        _ = LoadAvailableInterfacesAsync();
 
         try
         {
@@ -149,18 +206,36 @@ public partial class DiagnosticsViewModel : ObservableObject
 
         IsPinging = true;
         PingResults.Clear();
-        PingSummary = $"Отправка {PingCount} пакетов на {PingHost}...";
+
+        var countText = PingCount == 0 ? "непрерывно (∞)" : $"{PingCount} пакетов";
+        var ifaceText = SelectedInterface != "По умолчанию (Авто)" && !string.IsNullOrWhiteSpace(SelectedInterface) 
+            ? $" через {SelectedInterface}" 
+            : "";
+        PingSummary = $"Отправка {countText} на {PingHost}{ifaceText}...";
 
         _pingCts = new CancellationTokenSource();
         try
         {
-            await _diagService.RunPingAsync(PingHost.Trim(), PingCount, result =>
-            {
-                App.Current?.Dispatcher?.Invoke(() =>
+            await _diagService.RunPingAsync(
+                PingHost.Trim(), 
+                PingCount, 
+                SelectedInterface, 
+                PacketSize, 
+                ExtraPingArgs, 
+                result =>
                 {
-                    PingResults.Add(result);
-                });
-            }, _pingCts.Token);
+                    App.Current?.Dispatcher?.Invoke(() =>
+                    {
+                        PingResults.Add(result);
+                        if (PingCount == 0)
+                        {
+                            var succ = PingResults.Count(p => p.Success);
+                            var l = (PingResults.Count - succ) * 100.0 / PingResults.Count;
+                            PingSummary = $"Непрерывный пинг: отправлено {PingResults.Count}, получено {succ} (потери: {l:0}%)";
+                        }
+                    });
+                }, 
+                _pingCts.Token);
 
             var successCount = PingResults.Count(p => p.Success);
             var loss = PingCount > 0 ? (PingCount - successCount) * 100.0 / PingCount : 0;
@@ -172,7 +247,8 @@ public partial class DiagnosticsViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            PingSummary = $"Ошибка пинга: {ex.Message}";
+            if (!_pingCts.IsCancellationRequested)
+                PingSummary = $"Ошибка пинга: {ex.Message}";
         }
         finally
         {
@@ -183,7 +259,23 @@ public partial class DiagnosticsViewModel : ObservableObject
     [RelayCommand]
     public void StopPing()
     {
+        if (!IsPinging) return;
         _pingCts?.Cancel();
+        IsPinging = false;
+
+        var successCount = PingResults.Count(p => p.Success);
+        var total = PingResults.Count;
+        var loss = total > 0 ? (total - successCount) * 100.0 / total : 0;
+        PingSummary = $"Пинг остановлен пользователем (получено {successCount} из {total}, потери: {loss:0}%).";
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _ssh.ExecuteCommandAsync("killall -INT ping 2>/dev/null", 2);
+            }
+            catch { }
+        });
     }
 
     [RelayCommand]
@@ -218,7 +310,18 @@ public partial class DiagnosticsViewModel : ObservableObject
     [RelayCommand]
     public void StopTraceroute()
     {
+        if (!IsTracing) return;
         _traceCts?.Cancel();
+        IsTracing = false;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _ssh.ExecuteCommandAsync("killall -INT traceroute 2>/dev/null", 2);
+            }
+            catch { }
+        });
     }
 
     [RelayCommand]

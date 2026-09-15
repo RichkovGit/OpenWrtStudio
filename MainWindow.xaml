@@ -89,8 +89,11 @@
                                Command="{Binding ConnectCommand}" Margin="0,0,6,0"
                                Visibility="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" />
                     <ui:Button Appearance="Danger" Icon="{ui:SymbolIcon LinkDismiss24}" Content="Отключить" 
-                               Command="{Binding DisconnectCommand}" 
+                               Command="{Binding DisconnectCommand}" Margin="0,0,6,0"
                                Visibility="{Binding IsConnected, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon Search24}" Content="🔍 Автопоиск" 
+                               Command="{Binding AutoDiscoverRouterCommand}" 
+                               ToolTip="Автоматическое обнаружение роутера в локальной сети" />
                 </StackPanel>
 
                 <!-- Status Text & Busy Indicator -->
@@ -280,11 +283,21 @@
                                 <TextBlock Text="Плагины и Темы" VerticalAlignment="Center" FontWeight="Medium" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                             </StackPanel>
                         </RadioButton>
+
+                        <!-- 9: USB Устройства (Beta) (Expert) -->
+                        <RadioButton x:Name="NavUsb" Style="{StaticResource SidebarNavRadioButtonStyle}"
+                                     Visibility="{Binding IsExpertMode, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                     IsChecked="{Binding SelectedNavIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=9, Mode=TwoWay}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="HardDrive24" FontSize="18" Foreground="#F59E0B" Margin="0,0,10,0" />
+                                <TextBlock Text="USB Устройства (Beta)" VerticalAlignment="Center" FontWeight="Medium" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                            </StackPanel>
+                        </RadioButton>
                     </StackPanel>
 
-                    <!-- Footer: 9: Settings item -->
+                    <!-- Footer: 10: Settings item -->
                     <RadioButton Grid.Row="1" x:Name="NavSettings" Style="{StaticResource SidebarNavRadioButtonStyle}"
-                                 IsChecked="{Binding SelectedNavIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=9, Mode=TwoWay}">
+                                 IsChecked="{Binding SelectedNavIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=10, Mode=TwoWay}">
                         <StackPanel Orientation="Horizontal">
                             <ui:SymbolIcon Symbol="Settings24" FontSize="18" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" Margin="0,0,10,0" />
                             <TextBlock Text="Настройки" VerticalAlignment="Center" FontWeight="Medium" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
@@ -347,7 +360,11 @@
                 <TabItem>
                     <views:PackagesView DataContext="{Binding PackagesVM}" />
                 </TabItem>
-                <!-- 9: Настройки -->
+                <!-- 9: USB Устройства (Beta) -->
+                <TabItem>
+                    <views:UsbConfigView DataContext="{Binding UsbVM}" />
+                </TabItem>
+                <!-- 10: Настройки -->
                 <TabItem>
                     <views:SettingsView DataContext="{Binding SettingsVM}" />
                 </TabItem>

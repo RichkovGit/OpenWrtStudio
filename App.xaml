@@ -27,6 +27,11 @@
             <converters:BoolToAppearanceConverter x:Key="BoolToAppearanceConverter" />
             <converters:InverseBoolToAppearanceConverter x:Key="InverseBoolToAppearanceConverter" />
             <converters:StringNotEmptyToVisibilityConverter x:Key="StringNotEmptyToVisibilityConverter" />
+            <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
+            <converters:BooleanToBrushConverter x:Key="BooleanToBrushConverter" />
+            <converters:BooleanToConnectedTextConverter x:Key="BooleanToConnectedTextConverter" />
+            <converters:BooleanToMountedTextConverter x:Key="BooleanToMountedTextConverter" />
+            <converters:ZeroCountToVisibilityConverter x:Key="ZeroCountToVisibilityConverter" />
             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         </ResourceDictionary>
     </Application.Resources>

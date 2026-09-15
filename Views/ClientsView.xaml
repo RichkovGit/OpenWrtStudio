@@ -46,20 +46,24 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- Card: Total -->
+            <!-- Card: Online -->
             <Border Grid.Column="0" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,0,8,0">
                 <StackPanel>
-                    <TextBlock Text="Всего устройств" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
-                    <TextBlock Text="{Binding TotalCount}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,4,0,0" />
+                    <TextBlock Text="В сети (Онлайн)" Foreground="#10B981" FontSize="12" FontWeight="SemiBold" />
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,4,0,0">
+                        <TextBlock Text="{Binding OnlineCount}" FontSize="24" FontWeight="Bold" Foreground="#10B981" />
+                        <TextBlock Text="{Binding TotalCount, StringFormat=' / {0}'}" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Bottom" Margin="4,0,0,3" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
 
             <!-- Card: Wi-Fi 5 GHz -->
             <Border Grid.Column="1" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,0,8,0">
                 <StackPanel>
-                    <TextBlock Text="Wi-Fi 5 GHz (Быстрый)" Foreground="#00D2FF" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="Wi-Fi 5 GHz" Foreground="#00D2FF" FontSize="12" FontWeight="SemiBold" />
                     <TextBlock Text="{Binding Wifi5Count}" FontSize="24" FontWeight="Bold" Foreground="#00D2FF" Margin="0,4,0,0" />
                 </StackPanel>
             </Border>
@@ -80,8 +84,16 @@
                 </StackPanel>
             </Border>
 
+            <!-- Card: Offline -->
+            <Border Grid.Column="4" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,0,8,0">
+                <StackPanel>
+                    <TextBlock Text="Офлайн (резерв)" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding OfflineCount}" FontSize="24" FontWeight="Bold" Foreground="#64748B" Margin="0,4,0,0" />
+                </StackPanel>
+            </Border>
+
             <!-- Card: Blocked -->
-            <Border Grid.Column="4" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="14,10">
+            <Border Grid.Column="5" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="14,10">
                 <StackPanel>
                     <TextBlock Text="Заблокировано" Foreground="#EF4444" FontSize="12" FontWeight="SemiBold" />
                     <TextBlock Text="{Binding BlockedCount}" FontSize="24" FontWeight="Bold" Foreground="#EF4444" Margin="0,4,0,0" />
@@ -93,7 +105,7 @@
         <Border Grid.Row="2" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="12,8" Margin="0,0,0,14">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="280" />
+                    <ColumnDefinition Width="260" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
@@ -105,13 +117,17 @@
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                     <ui:Button Content="Все" Appearance="{Binding SelectedFilter, Converter={StaticResource EqualStringToAppearanceConverter}, ConverterParameter='Все'}" 
                                Command="{Binding SetFilterCommand}" CommandParameter="Все" Margin="0,0,6,0" />
+                    <ui:Button Content="🟢 В сети" Appearance="{Binding SelectedFilter, Converter={StaticResource EqualStringToAppearanceConverter}, ConverterParameter='В сети'}" 
+                               Command="{Binding SetFilterCommand}" CommandParameter="В сети" Margin="0,0,6,0" />
                     <ui:Button Content="⚡ 5 GHz" Appearance="{Binding SelectedFilter, Converter={StaticResource EqualStringToAppearanceConverter}, ConverterParameter='5 GHz'}" 
                                Command="{Binding SetFilterCommand}" CommandParameter="5 GHz" Margin="0,0,6,0" />
                     <ui:Button Content="📶 2.4 GHz" Appearance="{Binding SelectedFilter, Converter={StaticResource EqualStringToAppearanceConverter}, ConverterParameter='2.4 GHz'}" 
                                Command="{Binding SetFilterCommand}" CommandParameter="2.4 GHz" Margin="0,0,6,0" />
                     <ui:Button Content="🔌 LAN" Appearance="{Binding SelectedFilter, Converter={StaticResource EqualStringToAppearanceConverter}, ConverterParameter='LAN'}" 
                                Command="{Binding SetFilterCommand}" CommandParameter="LAN" Margin="0,0,6,0" />
-                    <ui:Button Content="🚫 Заблокированные" Appearance="{Binding SelectedFilter, Converter={StaticResource EqualStringToAppearanceConverter}, ConverterParameter='Заблокировано'}" 
+                    <ui:Button Content="💤 Офлайн" Appearance="{Binding SelectedFilter, Converter={StaticResource EqualStringToAppearanceConverter}, ConverterParameter='Офлайн'}" 
+                               Command="{Binding SetFilterCommand}" CommandParameter="Офлайн" Margin="0,0,6,0" />
+                    <ui:Button Content="🚫 Блок" Appearance="{Binding SelectedFilter, Converter={StaticResource EqualStringToAppearanceConverter}, ConverterParameter='Заблокировано'}" 
                                Command="{Binding SetFilterCommand}" CommandParameter="Заблокировано" />
                 </StackPanel>
             </Grid>
@@ -140,7 +156,7 @@
                                     <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource SubtleFillColorSecondaryBrush}">
                                         <ui:SymbolIcon Symbol="Laptop24" FontSize="20" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                     </Border>
-                                    <Ellipse Width="10" Height="10" Fill="#10B981" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,2,2" />
+                                    <Ellipse Width="10" Height="10" Fill="{Binding StatusDotColor}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,2,2" />
                                 </Grid>
 
                                 <!-- Column 1: Device Name & Band Badge -->
@@ -187,7 +203,7 @@
                                 <!-- Column 5: Action Buttons -->
                                 <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center">
                                     <!-- Disconnect / Kick button -->
-                                    <ui:Button Icon="{ui:SymbolIcon PlugDisconnected20}" Appearance="Secondary" Content="Сбросить" ToolTip="Отключить устройство от Wi-Fi" 
+                                    <ui:Button Icon="{ui:SymbolIcon ArrowClockwise20}" Appearance="Secondary" Content="Сбросить" ToolTip="Сбросить сессию / Переподключить к Wi-Fi" 
                                                Command="{Binding DataContext.KickClientCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                CommandParameter="{Binding}" Margin="0,0,6,0" />
 

@@ -12,7 +12,8 @@ public interface IDiagnosticsService
 {
     Task<List<HealthCheckItem>> RunHealthAuditAsync();
     Task<(bool Success, string Message)> ExecuteFixAsync(HealthCheckItem item);
-    Task RunPingAsync(string host, int count, Action<PingResultItem> onProgress, CancellationToken ct);
+    Task<List<string>> GetNetworkInterfacesAsync();
+    Task RunPingAsync(string host, int count, string? iface, int packetSize, string? extraArgs, Action<PingResultItem> onProgress, CancellationToken ct);
     Task RunTracerouteAsync(string host, Action<TracerouteHop> onHop, CancellationToken ct);
     Task<List<LogEntry>> GetSystemLogsAsync(int lines = 200);
     Task<List<LogEntry>> GetKernelLogsAsync(int lines = 150);
@@ -276,27 +277,83 @@ public class DiagnosticsService : IDiagnosticsService
             : (false, $"Ошибка выполнения: {err}");
     }
 
-    public async Task RunPingAsync(string host, int count, Action<PingResultItem> onProgress, CancellationToken ct)
+    public async Task<List<string>> GetNetworkInterfacesAsync()
     {
-        var cmd = $"ping -c {count} -W 2 {host}";
+        var list = new List<string> { "По умолчанию (Авто)" };
+        if (!_ssh.IsConnected) return list;
+
+        var (code, outStr, _) = await _ssh.ExecuteCommandAsync("ls /sys/class/net 2>/dev/null", 5);
+        if (code == 0 && !string.IsNullOrWhiteSpace(outStr))
+        {
+            var ifaces = outStr.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                               .Where(i => i != "lo")
+                               .Distinct(StringComparer.OrdinalIgnoreCase)
+                               .OrderBy(i => i);
+            list.AddRange(ifaces);
+        }
+        return list;
+    }
+
+    public async Task RunPingAsync(string host, int count, string? iface, int packetSize, string? extraArgs, Action<PingResultItem> onProgress, CancellationToken ct)
+    {
+        var sb = new System.Text.StringBuilder("ping");
+
+        if (count > 0)
+        {
+            sb.Append($" -c {count}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(iface) && iface != "По умолчанию (Авто)" && iface != "Авто")
+        {
+            sb.Append($" -I {iface.Trim()}");
+        }
+
+        if (packetSize > 0 && packetSize != 56)
+        {
+            sb.Append($" -s {packetSize}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(extraArgs))
+        {
+            sb.Append($" {extraArgs.Trim()}");
+        }
+        else
+        {
+            sb.Append(" -W 2");
+        }
+
+        sb.Append($" {host.Trim()}");
+
+        var cmd = sb.ToString();
         int seq = 1;
         await _ssh.RunStreamingCommandAsync(cmd, line =>
         {
-            var m = Regex.Match(line, @"from\s+([^\s:]+).*?time=([\d\.]+)\s*ms");
+            var m = Regex.Match(line, @"from\s+([^\s:]+).*?time=([\d\.]+)\s*ms", RegexOptions.IgnoreCase);
             if (m.Success)
             {
                 double.TryParse(m.Groups[2].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var ms);
+                
+                var seqMatch = Regex.Match(line, @"(?:seq|icmp_seq)=(\d+)", RegexOptions.IgnoreCase);
+                int packetSeq = seqMatch.Success && int.TryParse(seqMatch.Groups[1].Value, out var ps) ? ps : seq++;
+
+                var ttlMatch = Regex.Match(line, @"ttl=(\d+)", RegexOptions.IgnoreCase);
+                int ttl = ttlMatch.Success && int.TryParse(ttlMatch.Groups[1].Value, out var t) ? t : 0;
+
                 onProgress(new PingResultItem
                 {
-                    Seq = seq++,
+                    Seq = packetSeq,
                     Host = host,
                     Ip = m.Groups[1].Value,
                     TimeMs = ms,
+                    Ttl = ttl,
                     Success = true,
                     RawText = line
                 });
             }
-            else if (line.Contains("time out") || line.Contains("Unreachable") || line.Contains("100% packet loss"))
+            else if (line.Contains("time out", StringComparison.OrdinalIgnoreCase) || 
+                     line.Contains("Unreachable", StringComparison.OrdinalIgnoreCase) || 
+                     line.Contains("packet loss", StringComparison.OrdinalIgnoreCase) ||
+                     line.Contains("errors", StringComparison.OrdinalIgnoreCase))
             {
                 onProgress(new PingResultItem
                 {

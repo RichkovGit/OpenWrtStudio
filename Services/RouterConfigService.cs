@@ -44,12 +44,13 @@ public class RouterConfigService : IRouterConfigService
         foreach (Match rm in radioMatches)
         {
             var rName = rm.Groups[1].Value;
+            var escR = Regex.Escape(rName);
             var radio = new WifiRadioConfig { Device = rName };
 
-            var bandMatch = Regex.Match(outStr, @$"wireless\.{rName}\.band='?([^'\r\n]+)'?");
-            var chanMatch = Regex.Match(outStr, @$"wireless\.{rName}\.channel='?([^'\r\n]+)'?");
-            var htMatch = Regex.Match(outStr, @$"wireless\.{rName}\.htmode='?([^'\r\n]+)'?");
-            var disMatch = Regex.Match(outStr, @$"wireless\.{rName}\.disabled='?([01])'?");
+            var bandMatch = Regex.Match(outStr, @$"wireless\.{escR}\.band='?([^'\r\n]+)'?");
+            var chanMatch = Regex.Match(outStr, @$"wireless\.{escR}\.channel='?([^'\r\n]+)'?");
+            var htMatch = Regex.Match(outStr, @$"wireless\.{escR}\.htmode='?([^'\r\n]+)'?");
+            var disMatch = Regex.Match(outStr, @$"wireless\.{escR}\.disabled='?([01])'?");
 
             radio.Band = bandMatch.Success ? bandMatch.Groups[1].Value : (rName.Contains("1") ? "5 GHz" : "2.4 GHz");
             radio.Channel = chanMatch.Success ? chanMatch.Groups[1].Value : "auto";
@@ -64,11 +65,12 @@ public class RouterConfigService : IRouterConfigService
         foreach (Match im in ifaceMatches)
         {
             var ifName = im.Groups[1].Value;
-            var devMatch = Regex.Match(outStr, @$"wireless\.{ifName}\.device='?([^'\r\n]+)'?");
-            var ssidMatch = Regex.Match(outStr, @$"wireless\.{ifName}\.ssid='?([^'\r\n]+)'?");
-            var encMatch = Regex.Match(outStr, @$"wireless\.{ifName}\.encryption='?([^'\r\n]+)'?");
-            var keyMatch = Regex.Match(outStr, @$"wireless\.{ifName}\.key='?([^'\r\n]+)'?");
-            var disMatch = Regex.Match(outStr, @$"wireless\.{ifName}\.disabled='?([01])'?");
+            var escIf = Regex.Escape(ifName);
+            var devMatch = Regex.Match(outStr, @$"wireless\.{escIf}\.device='?([^'\r\n]+)'?");
+            var ssidMatch = Regex.Match(outStr, @$"wireless\.{escIf}\.ssid='?([^'\r\n]+)'?");
+            var encMatch = Regex.Match(outStr, @$"wireless\.{escIf}\.encryption='?([^'\r\n]+)'?");
+            var keyMatch = Regex.Match(outStr, @$"wireless\.{escIf}\.key='?([^'\r\n]+)'?");
+            var disMatch = Regex.Match(outStr, @$"wireless\.{escIf}\.disabled='?([01])'?");
 
             var dev = devMatch.Success ? devMatch.Groups[1].Value : "radio0";
             var iface = new WifiIfaceConfig
@@ -151,16 +153,28 @@ public class RouterConfigService : IRouterConfigService
         foreach (Match hm in hostMatches)
         {
             var secId = hm.Groups[1].Value;
-            var nameM = Regex.Match(dhcpOut, @$"dhcp\.{secId}\.name='?([^'\r\n]+)'?");
-            var macM = Regex.Match(dhcpOut, @$"dhcp\.{secId}\.mac='?([^'\r\n]+)'?");
-            var ipLM = Regex.Match(dhcpOut, @$"dhcp\.{secId}\.ip='?([^'\r\n]+)'?");
+            var escSecId = Regex.Escape(secId);
+            var nameM = Regex.Match(dhcpOut, @$"dhcp\.{escSecId}\.name='?([^'\r\n]+)'?");
+            var macM = Regex.Match(dhcpOut, @$"dhcp\.{escSecId}\.mac='?([^'\r\n]+)'?");
+            var ipLM = Regex.Match(dhcpOut, @$"dhcp\.{escSecId}\.ip='?([^'\r\n]+)'?");
+
+            var name = nameM.Success ? nameM.Groups[1].Value : "";
+            var mac = macM.Success ? macM.Groups[1].Value : "";
+            var ip = ipLM.Success ? ipLM.Groups[1].Value : "";
+
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                name = !string.IsNullOrWhiteSpace(mac) && mac.Length >= 5
+                    ? $"Устройство {mac[^5..]}"
+                    : "Клиент";
+            }
 
             cfg.StaticLeases.Add(new StaticDhcpLease
             {
                 SectionId = secId,
-                Name = nameM.Success ? nameM.Groups[1].Value : "Host",
-                Mac = macM.Success ? macM.Groups[1].Value : "",
-                Ip = ipLM.Success ? ipLM.Groups[1].Value : ""
+                Name = name,
+                Mac = mac,
+                Ip = ip
             });
         }
 
@@ -245,12 +259,13 @@ public class RouterConfigService : IRouterConfigService
         foreach (Match m in matches)
         {
             var sec = m.Groups[1].Value;
-            var nameM = Regex.Match(outStr, @$"firewall\.{sec}\.name='?([^'\r\n]+)'?");
-            var srcPortM = Regex.Match(outStr, @$"firewall\.{sec}\.src_dport='?([^'\r\n]+)'?");
-            var destIpM = Regex.Match(outStr, @$"firewall\.{sec}\.dest_ip='?([^'\r\n]+)'?");
-            var destPortM = Regex.Match(outStr, @$"firewall\.{sec}\.dest_port='?([^'\r\n]+)'?");
-            var protoM = Regex.Match(outStr, @$"firewall\.{sec}\.proto='?([^'\r\n]+)'?");
-            var enM = Regex.Match(outStr, @$"firewall\.{sec}\.enabled='?([01])'?");
+            var escSec = Regex.Escape(sec);
+            var nameM = Regex.Match(outStr, @$"firewall\.{escSec}\.name='?([^'\r\n]+)'?");
+            var srcPortM = Regex.Match(outStr, @$"firewall\.{escSec}\.src_dport='?([^'\r\n]+)'?");
+            var destIpM = Regex.Match(outStr, @$"firewall\.{escSec}\.dest_ip='?([^'\r\n]+)'?");
+            var destPortM = Regex.Match(outStr, @$"firewall\.{escSec}\.dest_port='?([^'\r\n]+)'?");
+            var protoM = Regex.Match(outStr, @$"firewall\.{escSec}\.proto='?([^'\r\n]+)'?");
+            var enM = Regex.Match(outStr, @$"firewall\.{escSec}\.enabled='?([01])'?");
 
             list.Add(new PortForwardRule
             {

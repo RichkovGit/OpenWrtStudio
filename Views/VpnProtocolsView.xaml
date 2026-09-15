@@ -112,6 +112,7 @@
 
                     <!-- TAB 0: AMNEZIAWG -->
                     <StackPanel Visibility="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToVisibilityConverter}, ConverterParameter=0}">
+                        <!-- Header with Actions -->
                         <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -119,23 +120,80 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="Настройки AmneziaWG (Анти-DPI WireGuard)" FontWeight="Bold" FontSize="15" />
-                                <TextBlock Text="Поддерживает стандартный WireGuard и параметры обфускации Jc/Jmin/Jmax/S1/S2/H1-H4" 
+                                <TextBlock Text="Поддерживает множественные интерфейсы (AWG, AWG_Warp и др.) и обфускацию Jc/Jmin/Jmax/S1/S2/H1-H4" 
                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
                             </StackPanel>
-                            <ui:Button Grid.Column="1" Appearance="Secondary" Icon="{ui:SymbolIcon ArrowUpload24}" Content="Импортировать .conf файл" Command="{Binding ImportAwgConfCommand}" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowUpload24}" Content="Импорт .conf" Command="{Binding ImportAwgConfCommand}" Margin="0,0,6,0" />
+                                <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon Add24}" Content="+ Новый туннель" Command="{Binding CreateNewAwgCommand}" Margin="0,0,6,0" />
+                                <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Content="Обновить" Command="{Binding LoadAwgConfigsCommand}" />
+                            </StackPanel>
                         </Grid>
+
+                        <!-- Interface Selector & Status Bar -->
+                        <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <!-- Row 0: Interface Selector ComboBox & Quick Action Buttons -->
+                                <Grid Grid.Row="0" Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Выбор туннеля:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding ExistingAwgConfigs}" SelectedItem="{Binding SelectedAwgConfig, Mode=TwoWay}" VerticalAlignment="Center">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="⚡ " Foreground="#10B981" />
+                                                    <TextBlock Text="{Binding InterfaceName}" FontWeight="Bold" Margin="0,0,8,0" />
+                                                    <TextBlock Text="{Binding Address, StringFormat='({0})'}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,10,0" />
+                                                    <Border CornerRadius="4" Padding="6,1" Background="{Binding IsActive, Converter={StaticResource BoolToStatusBrushConverter}}">
+                                                        <TextBlock Text="{Binding StatusText}" FontSize="10" Foreground="White" />
+                                                    </Border>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="10,0,0,0">
+                                        <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowSync24}" Content="Перезапустить" Command="{Binding RestartAwgConfigCommand}" Margin="0,0,6,0" />
+                                        <ui:Button Appearance="Danger" Icon="{ui:SymbolIcon Delete24}" Content="Удалить" Command="{Binding DeleteAwgConfigCommand}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Row 1: Live Status Info Strip -->
+                                <Border Grid.Row="1" Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10,6">
+                                    <Grid>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Ellipse Width="10" Height="10" Margin="0,0,8,0"
+                                                     Fill="{Binding AwgConfig.IsActive, Converter={StaticResource BoolToStatusBrushConverter}}" />
+                                            <TextBlock Text="Статус: " FontWeight="Medium" />
+                                            <TextBlock Text="{Binding AwgConfig.StatusText}" FontWeight="Bold" Margin="0,0,16,0" />
+                                            <TextBlock Text="{Binding AwgConfig.LatestHandshake, StringFormat='Рукопожатие (Handshake): {0}'}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,16,0" />
+                                            <TextBlock Text="{Binding AwgConfig.TransferRx, StringFormat='↓ Rx: {0}'}" Foreground="#10B981" FontWeight="SemiBold" Margin="0,0,12,0" />
+                                            <TextBlock Text="{Binding AwgConfig.TransferTx, StringFormat='↑ Tx: {0}'}" Foreground="#3B82F6" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Border>
 
                         <TextBlock Text="Интерфейс (Interface)" FontWeight="SemiBold" Margin="0,6,0,6" />
                         <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="140" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="160" />
                                 <ColumnDefinition Width="100" />
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Margin="0,0,8,0">
-                                <TextBlock Text="Имя" FontSize="11" Margin="0,0,0,2" />
+                                <TextBlock Text="Имя интерфейса" FontSize="11" Margin="0,0,0,2" />
                                 <ui:TextBox Text="{Binding AwgConfig.InterfaceName, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
 
@@ -265,7 +323,11 @@
                             </StackPanel>
                         </Grid>
 
-                        <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Checkmark24}" Content="Применить AmneziaWG на роутере" Command="{Binding ApplyAwgConfigCommand}" />
+                        <StackPanel Orientation="Horizontal">
+                            <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Checkmark24}" Content="Применить AmneziaWG на роутере" Command="{Binding ApplyAwgConfigCommand}" Margin="0,0,10,0" />
+                            <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowSync24}" Content="Перезапустить (ifup)" Command="{Binding RestartAwgConfigCommand}" Margin="0,0,10,0" />
+                            <ui:Button Appearance="Danger" Icon="{ui:SymbolIcon Delete24}" Content="Удалить конфигурацию" Command="{Binding DeleteAwgConfigCommand}" />
+                        </StackPanel>
                     </StackPanel>
 
                     <!-- TAB 1: SING-BOX -->

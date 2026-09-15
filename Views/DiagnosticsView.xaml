@@ -119,6 +119,42 @@
                                         <ui:Button Appearance="Secondary" Content="Стоп" Command="{Binding StopPingCommand}" IsEnabled="{Binding IsPinging}" />
                                     </StackPanel>
                                 </Grid>
+
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="135" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="80" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Packets count preset -->
+                                    <StackPanel Margin="0,0,8,0">
+                                        <TextBlock Text="Пакетов (-c):" FontSize="11" Margin="0,0,0,2" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        <ComboBox Text="{Binding SelectedPingCountPreset, UpdateSourceTrigger=PropertyChanged}" IsEditable="True">
+                                            <ComboBoxItem Content="5" IsSelected="True" />
+                                            <ComboBoxItem Content="10" />
+                                            <ComboBoxItem Content="20" />
+                                            <ComboBoxItem Content="50" />
+                                            <ComboBoxItem Content="100" />
+                                            <ComboBoxItem Content="Бесконечно (∞)" />
+                                        </ComboBox>
+                                    </StackPanel>
+
+                                    <!-- Interface selector -->
+                                    <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                        <TextBlock Text="Интерфейс (-I):" FontSize="11" Margin="0,0,0,2" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        <ComboBox ItemsSource="{Binding AvailableInterfaces}" 
+                                                  SelectedItem="{Binding SelectedInterface, Mode=TwoWay}"
+                                                  IsEditable="True" ToolTip="Выберите интерфейс роутера или введите имя туннеля (например: br-lan, wan, AWG, AWG_Warp)" />
+                                    </StackPanel>
+
+                                    <!-- Packet Size (bytes) -->
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Размер (-s):" FontSize="11" Margin="0,0,0,2" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        <ui:TextBox Text="{Binding PacketSize, UpdateSourceTrigger=PropertyChanged}" ToolTip="Размер пакета в байтах (по умолчанию 56, для теста MTU: 1420)" />
+                                    </StackPanel>
+                                </Grid>
+
                                 <TextBlock Text="{Binding PingSummary}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
                             </StackPanel>
 

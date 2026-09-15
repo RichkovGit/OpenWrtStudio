@@ -117,11 +117,15 @@ public class SshService : ISshService, IDisposable
             return (-1, string.Empty, "Нет подключения к роутеру");
         }
 
+        // OpenWrt Dropbear / BusyBox ash requires pure Unix \n newlines.
+        // Windows \r\n causes 'syntax error: unexpected word (expecting "do")' in shell loops.
+        var unixCmd = command.Replace("\r\n", "\n").Replace("\r", "\n");
+
         return await Task.Run(() =>
         {
             try
             {
-                using var cmd = _sshClient.CreateCommand(command);
+                using var cmd = _sshClient.CreateCommand(unixCmd);
                 cmd.CommandTimeout = TimeSpan.FromSeconds(timeoutSeconds);
                 var asyncResult = cmd.BeginExecute();
                 asyncResult.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(timeoutSeconds));
@@ -144,39 +148,59 @@ public class SshService : ISshService, IDisposable
             return;
         }
 
+        var unixCmd = command.Replace("\r\n", "\n").Replace("\r", "\n");
+
         await Task.Run(() =>
         {
+            SshCommand? cmd = null;
+            CancellationTokenRegistration? reg = null;
             try
             {
-                using var cmd = _sshClient.CreateCommand(command);
-                var asyncResult = cmd.BeginExecute();
-
-                using var reader = new StreamReader(cmd.OutputStream, Encoding.UTF8);
-                while (!asyncResult.IsCompleted && !cancellationToken.IsCancellationRequested)
+                cmd = _sshClient.CreateCommand(unixCmd);
+                reg = cancellationToken.Register(() =>
                 {
-                    while (!reader.EndOfStream)
+                    try
                     {
-                        var line = reader.ReadLine();
-                        if (line != null)
-                        {
-                            onLineReceived(line);
-                        }
+                        cmd?.CancelAsync();
                     }
-                    Thread.Sleep(50);
-                }
+                    catch { }
+                });
 
-                while (!reader.EndOfStream)
+                var asyncResult = cmd.BeginExecute();
+                using var reader = new StreamReader(cmd.OutputStream, Encoding.UTF8);
+
+                while (!cancellationToken.IsCancellationRequested)
                 {
                     var line = reader.ReadLine();
                     if (line != null)
                     {
                         onLineReceived(line);
                     }
+                    else
+                    {
+                        if (asyncResult.IsCompleted) break;
+                        Thread.Sleep(40);
+                    }
+
+                    if (asyncResult.IsCompleted && reader.EndOfStream) break;
                 }
             }
             catch (Exception ex)
             {
-                onLineReceived($"[Ошибка потока]: {ex.Message}");
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    onLineReceived($"[Ошибка потока]: {ex.Message}");
+                }
+            }
+            finally
+            {
+                reg?.Dispose();
+                try
+                {
+                    cmd?.CancelAsync();
+                }
+                catch { }
+                cmd?.Dispose();
             }
         }, cancellationToken);
     }

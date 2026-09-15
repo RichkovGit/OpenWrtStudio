@@ -7,15 +7,38 @@ public partial class NetworkClient : ObservableObject
 {
     [ObservableProperty] private string _macAddress = string.Empty;
     [ObservableProperty] private string _ipAddress = string.Empty;
-    [ObservableProperty] private string _hostname = "Неизвестное устройство";
-    [ObservableProperty] private string _customName = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayName))]
+    private string _hostname = "Неизвестное устройство";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayName))]
+    private string _customName = string.Empty;
+
     [ObservableProperty] private string _interfaceName = string.Empty;
-    [ObservableProperty] private string _band = "LAN"; // "2.4 GHz", "5 GHz", "LAN"
-    [ObservableProperty] private int _signalDbm = 0;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(BandBadgeColor))]
+    [NotifyPropertyChangedFor(nameof(DeviceIcon))]
+    [NotifyPropertyChangedFor(nameof(SignalQuality))]
+    private string _band = "LAN"; // "2.4 GHz", "5 GHz", "LAN"
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SignalQuality))]
+    private int _signalDbm = 0;
+
     [ObservableProperty] private string _rxBitrate = string.Empty;
     [ObservableProperty] private string _txBitrate = string.Empty;
     [ObservableProperty] private string _connectedDuration = string.Empty;
-    [ObservableProperty] private bool _isOnline = true;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SignalQuality))]
+    [NotifyPropertyChangedFor(nameof(StatusDotColor))]
+    [NotifyPropertyChangedFor(nameof(BandBadgeColor))]
+    [NotifyPropertyChangedFor(nameof(DeviceIcon))]
+    private bool _isOnline = true;
+
     [ObservableProperty] private bool _isBlocked = false;
     [ObservableProperty] private bool _isStaticLease = false;
     [ObservableProperty] private string _vendor = string.Empty;
@@ -28,26 +51,33 @@ public partial class NetworkClient : ObservableObject
     {
         get
         {
+            if (!IsOnline) return "Не в сети (Офлайн / Резерв IP)";
             if (Band == "LAN") return "Проводное соединение (1 Gbps)";
             if (SignalDbm >= -55) return $"Отличный ({SignalDbm} dBm)";
             if (SignalDbm >= -68) return $"Хороший ({SignalDbm} dBm)";
             if (SignalDbm >= -78) return $"Средний ({SignalDbm} dBm)";
             if (SignalDbm < 0) return $"Слабый ({SignalDbm} dBm)";
-            return "N/A";
+            return "В сети (Онлайн)";
         }
     }
 
-    public string BandBadgeColor => Band switch
-    {
-        "5 GHz" => "#00D2FF",
-        "2.4 GHz" => "#10B981",
-        _ => "#8B5CF6"
-    };
+    public string StatusDotColor => IsOnline ? "#10B981" : "#64748B";
 
-    public string DeviceIcon => Band switch
-    {
-        "5 GHz" => "WifiSettings20",
-        "2.4 GHz" => "Wifi220",
-        _ => "Ethernet20"
-    };
+    public string BandBadgeColor => !IsOnline 
+        ? "#64748B" 
+        : Band switch
+        {
+            "5 GHz" => "#00D2FF",
+            "2.4 GHz" => "#10B981",
+            _ => "#8B5CF6"
+        };
+
+    public string DeviceIcon => !IsOnline
+        ? "PlugDisconnected20"
+        : Band switch
+        {
+            "5 GHz" => "WifiSettings20",
+            "2.4 GHz" => "Wifi220",
+            _ => "Ethernet20"
+        };
 }

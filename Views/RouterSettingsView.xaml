@@ -201,6 +201,20 @@
 
                         <TextBlock Text="Статические IP адреса по MAC (Static Leases)" FontWeight="SemiBold" Margin="0,10,0,8" />
                         
+                        <!-- Table Header -->
+                        <Grid Margin="10,4,10,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180" />
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Имя хоста" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="1" Text="MAC-адрес" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="2" Text="Назначенный статический IP" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="3" Text="Удалить" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontWeight="SemiBold" Margin="0,0,4,0" />
+                        </Grid>
+
                         <!-- Static Leases List -->
                         <ItemsControl ItemsSource="{Binding StaticLeases}">
                             <ItemsControl.ItemTemplate>

@@ -19,12 +19,14 @@ public partial class ClientsViewModel : ObservableObject
     [ObservableProperty] private ObservableCollection<NetworkClient> _filteredClients = new();
 
     [ObservableProperty] private string _searchQuery = string.Empty;
-    [ObservableProperty] private string _selectedFilter = "Все"; // Все, 5 GHz, 2.4 GHz, LAN, Блокированные
+    [ObservableProperty] private string _selectedFilter = "Все"; // Все, В сети, 5 GHz, 2.4 GHz, LAN, Офлайн, Заблокировано
 
     [ObservableProperty] private int _totalCount = 0;
+    [ObservableProperty] private int _onlineCount = 0;
     [ObservableProperty] private int _wifi5Count = 0;
     [ObservableProperty] private int _wifi24Count = 0;
     [ObservableProperty] private int _lanCount = 0;
+    [ObservableProperty] private int _offlineCount = 0;
     [ObservableProperty] private int _blockedCount = 0;
 
     [ObservableProperty] private bool _isLoading = false;
@@ -56,33 +58,30 @@ public partial class ClientsViewModel : ObservableObject
         {
             var list = await _clientManager.GetClientsAsync();
             var dispatcher = Application.Current?.Dispatcher;
-            if (dispatcher != null && !dispatcher.CheckAccess())
-            {
-                dispatcher.Invoke(() =>
-                {
-                    Clients.Clear();
-                    foreach (var c in list) Clients.Add(c);
-                    TotalCount = Clients.Count;
-                    Wifi5Count = Clients.Count(x => x.Band == "5 GHz");
-                    Wifi24Count = Clients.Count(x => x.Band == "2.4 GHz");
-                    LanCount = Clients.Count(x => x.Band == "LAN");
-                    BlockedCount = Clients.Count(x => x.IsBlocked);
-                    ApplyFilter();
-                });
-            }
-            else
+            Action updateAction = () =>
             {
                 Clients.Clear();
                 foreach (var c in list) Clients.Add(c);
                 TotalCount = Clients.Count;
-                Wifi5Count = Clients.Count(x => x.Band == "5 GHz");
-                Wifi24Count = Clients.Count(x => x.Band == "2.4 GHz");
-                LanCount = Clients.Count(x => x.Band == "LAN");
+                OnlineCount = Clients.Count(x => x.IsOnline);
+                Wifi5Count = Clients.Count(x => x.IsOnline && x.Band == "5 GHz");
+                Wifi24Count = Clients.Count(x => x.IsOnline && x.Band == "2.4 GHz");
+                LanCount = Clients.Count(x => x.IsOnline && x.Band == "LAN");
+                OfflineCount = Clients.Count(x => !x.IsOnline);
                 BlockedCount = Clients.Count(x => x.IsBlocked);
                 ApplyFilter();
+            };
+
+            if (dispatcher != null && !dispatcher.CheckAccess())
+            {
+                dispatcher.Invoke(updateAction);
+            }
+            else
+            {
+                updateAction();
             }
 
-            StatusMessage = $"Обновлено: {DateTime.Now:HH:mm:ss} • Найдено {TotalCount} устройств";
+            StatusMessage = $"Обновлено: {DateTime.Now:HH:mm:ss} • В сети: {OnlineCount} из {TotalCount} (5 GHz: {Wifi5Count}, 2.4 GHz: {Wifi24Count}, LAN: {LanCount}, Офлайн: {OfflineCount})";
         }
         catch (Exception ex)
         {
@@ -110,9 +109,11 @@ public partial class ClientsViewModel : ObservableObject
             // Category filter
             return SelectedFilter switch
             {
-                "5 GHz" => c.Band == "5 GHz",
-                "2.4 GHz" => c.Band == "2.4 GHz",
-                "LAN" => c.Band == "LAN",
+                "В сети" => c.IsOnline,
+                "5 GHz" => c.IsOnline && c.Band == "5 GHz",
+                "2.4 GHz" => c.IsOnline && c.Band == "2.4 GHz",
+                "LAN" => c.IsOnline && c.Band == "LAN",
+                "Офлайн" => !c.IsOnline,
                 "Заблокировано" => c.IsBlocked,
                 _ => true
             };
@@ -144,10 +145,17 @@ public partial class ClientsViewModel : ObservableObject
     public async Task KickClientAsync(NetworkClient? client)
     {
         if (client == null) return;
-        StatusMessage = $"Отключение {client.DisplayName}...";
+        StatusMessage = $"Сброс соединения для {client.DisplayName}...";
         var res = await _clientManager.KickClientAsync(client.MacAddress);
         StatusMessage = res.Message;
-        await Task.Delay(1000);
+        client.IsOnline = false;
+        OnlineCount = Clients.Count(x => x.IsOnline);
+        OfflineCount = Clients.Count(x => !x.IsOnline);
+        Wifi5Count = Clients.Count(x => x.IsOnline && x.Band == "5 GHz");
+        Wifi24Count = Clients.Count(x => x.IsOnline && x.Band == "2.4 GHz");
+        LanCount = Clients.Count(x => x.IsOnline && x.Band == "LAN");
+        ApplyFilter();
+        await Task.Delay(2500);
         await LoadClientsAsync();
     }
 

@@ -13,6 +13,7 @@ public partial class MainViewModel : ObservableObject
     private readonly ISshService _ssh;
     private readonly IProfileService _profileService;
     private readonly ISentinelService _sentinelService;
+    private readonly IRouterDiscoveryService _discoveryService;
 
     [ObservableProperty]
     private string _title = "OpenWrt Studio";
@@ -67,10 +68,16 @@ public partial class MainViewModel : ObservableObject
         SelectedNavIndex = target switch
         {
             "Dashboard" or "0" => 0,
-            "Diagnostics" or "1" => 1,
-            "Packages" or "2" => 2,
-            "Mihomo" or "3" => 3,
-            "Settings" or "4" => 4,
+            "Clients" or "1" => 1,
+            "Router" or "2" => 2,
+            "Vpn" or "3" => 3,
+            "Mihomo" or "4" => 4,
+            "Forkop" or "5" => 5,
+            "Scheduler" or "6" => 6,
+            "Diagnostics" or "7" => 7,
+            "Packages" or "8" => 8,
+            "Usb" or "9" => 9,
+            "Settings" or "10" => 10,
             _ => 0
         };
     }
@@ -107,12 +114,14 @@ public partial class MainViewModel : ObservableObject
     public SchedulerViewModel SchedulerVM { get; }
     public DiagnosticsViewModel DiagnosticsVM { get; }
     public PackagesViewModel PackagesVM { get; }
+    public UsbConfigViewModel UsbVM { get; }
     public SettingsViewModel SettingsVM { get; }
 
     public MainViewModel(
         ISshService ssh,
         IProfileService profileService,
         ISentinelService sentinelService,
+        IRouterDiscoveryService discoveryService,
         DashboardViewModel dashboardVM,
         ClientsViewModel clientsVM,
         RouterSettingsViewModel routerSettingsVM,
@@ -122,11 +131,13 @@ public partial class MainViewModel : ObservableObject
         SchedulerViewModel schedulerVM,
         DiagnosticsViewModel diagnosticsVM,
         PackagesViewModel packagesVM,
+        UsbConfigViewModel usbVM,
         SettingsViewModel settingsVM)
     {
         _ssh = ssh;
         _profileService = profileService;
         _sentinelService = sentinelService;
+        _discoveryService = discoveryService;
         DashboardVM = dashboardVM;
         ClientsVM = clientsVM;
         RouterSettingsVM = routerSettingsVM;
@@ -136,11 +147,45 @@ public partial class MainViewModel : ObservableObject
         SchedulerVM = schedulerVM;
         DiagnosticsVM = diagnosticsVM;
         PackagesVM = packagesVM;
+        UsbVM = usbVM;
         SettingsVM = settingsVM;
 
         _ssh.ConnectionChanged += OnConnectionChanged;
         _sentinelService.IssueChanged += OnSentinelIssueChanged;
         _profileService.ProfilesSaved += OnProfilesSaved;
+    }
+
+    [RelayCommand]
+    public async Task AutoDiscoverRouterAsync()
+    {
+        IsBusy = true;
+        BusyStatus = "Поиск роутера в локальной сети...";
+        try
+        {
+            var username = SelectedProfile?.Username ?? "root";
+            var password = SelectedProfile?.Password ?? "";
+
+            var progress = new Progress<string>(msg => App.Current?.Dispatcher?.Invoke(() => BusyStatus = msg));
+            var profile = await _discoveryService.AutoAddDiscoveredRouterAsync(username, password, progress);
+            if (profile != null)
+            {
+                ShowAlert($"Роутер успешно найден и добавлен: {profile.Name}", false);
+                SelectedProfile = profile;
+                await ConnectAsync();
+            }
+            else
+            {
+                ShowAlert("Роутер не обнаружен или указан неверный пароль", true);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Ошибка автопоиска: {ex.Message}", true);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private void OnProfilesSaved(object? sender, List<ConnectionProfile> list)

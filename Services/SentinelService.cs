@@ -22,7 +22,7 @@ public interface ISentinelService
 public class SentinelService : ISentinelService
 {
     private readonly ISshService _ssh;
-    private readonly DispatcherTimer _watchdogTimer;
+    private readonly DispatcherTimer? _watchdogTimer;
 
     public bool IsMonitoring { get; set; } = true;
     public SentinelIssue? CurrentIssue { get; private set; }
@@ -31,18 +31,28 @@ public class SentinelService : ISentinelService
     public SentinelService(ISshService ssh)
     {
         _ssh = ssh;
-        _watchdogTimer = new DispatcherTimer
+        try
         {
-            Interval = TimeSpan.FromSeconds(12)
-        };
-        _watchdogTimer.Tick += async (_, _) =>
-        {
-            if (_ssh.IsConnected && IsMonitoring)
+            if (System.Windows.Application.Current != null)
             {
-                await ProbeHealthAsync();
+                _watchdogTimer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromSeconds(12)
+                };
+                _watchdogTimer.Tick += async (_, _) =>
+                {
+                    if (_ssh.IsConnected && IsMonitoring)
+                    {
+                        await ProbeHealthAsync();
+                    }
+                };
+                _watchdogTimer.Start();
             }
-        };
-        _watchdogTimer.Start();
+        }
+        catch
+        {
+            // Non-UI or unit testing environment
+        }
     }
 
     public async Task<SentinelIssue?> ProbeHealthAsync()

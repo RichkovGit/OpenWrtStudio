@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -24,6 +25,8 @@ public partial class VpnProtocolsViewModel : ObservableObject
     [ObservableProperty] private string _statusMessage = "Готов к настройке VPN протоколов.";
 
     // --- AmneziaWG & WireGuard Parameters ---
+    [ObservableProperty] private ObservableCollection<AmneziaWgConfig> _existingAwgConfigs = new();
+    [ObservableProperty] private AmneziaWgConfig? _selectedAwgConfig;
     [ObservableProperty] private AmneziaWgConfig _awgConfig = new();
 
     // --- Sing-box Parameters ---
@@ -62,7 +65,8 @@ public partial class VpnProtocolsViewModel : ObservableObject
         {
             Report = await _capService.ScanCapabilitiesAsync();
             Protocols = new ObservableCollection<VpnProtocolCapability>(Report.Protocols);
-            StatusMessage = $"Анализ завершен! Роутер: {Report.RouterModel}, система: {Report.OpenWrtVersion} ({Report.Architecture}).";
+            await LoadAwgConfigsAsync();
+            StatusMessage = $"Анализ завершен! Роутер: {Report.RouterModel}, система: {Report.OpenWrtVersion} ({Report.Architecture}). Найдено туннелей AWG: {ExistingAwgConfigs.Count}.";
         }
         catch (Exception ex)
         {
@@ -71,6 +75,98 @@ public partial class VpnProtocolsViewModel : ObservableObject
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task LoadAwgConfigsAsync()
+    {
+        if (!_ssh.IsConnected) return;
+
+        try
+        {
+            var list = await _vpnService.GetAmneziaWgConfigsAsync();
+            ExistingAwgConfigs = new ObservableCollection<AmneziaWgConfig>(list);
+            if (ExistingAwgConfigs.Count > 0)
+            {
+                var match = ExistingAwgConfigs.FirstOrDefault(c => c.InterfaceName == AwgConfig.InterfaceName) ?? ExistingAwgConfigs[0];
+                SelectedAwgConfig = match;
+            }
+            else
+            {
+                SelectedAwgConfig = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Ошибка загрузки туннелей AWG: {ex.Message}";
+        }
+    }
+
+    partial void OnSelectedAwgConfigChanged(AmneziaWgConfig? value)
+    {
+        if (value == null) return;
+        AwgConfig = value;
+    }
+
+    [RelayCommand]
+    public void CreateNewAwg()
+    {
+        SelectedAwgConfig = null;
+        AwgConfig = new AmneziaWgConfig
+        {
+            InterfaceName = $"awg{ExistingAwgConfigs.Count}",
+            Address = "10.8.0.2/24",
+            ListenPort = 51820 + ExistingAwgConfigs.Count,
+            Jc = 4,
+            Jmin = 40,
+            Jmax = 70,
+            S1 = 15,
+            S2 = 25,
+            H1 = 1,
+            H2 = 2,
+            H3 = 3,
+            H4 = 4,
+            AllowedIPs = "0.0.0.0/0, ::/0",
+            PersistentKeepalive = 25
+        };
+        StatusMessage = "Создание нового интерфейса AmneziaWG. Заполните параметры или импортируйте .conf файл.";
+    }
+
+    [RelayCommand]
+    public async Task DeleteAwgConfigAsync()
+    {
+        if (!_ssh.IsConnected) return;
+        if (string.IsNullOrWhiteSpace(AwgConfig.InterfaceName)) return;
+
+        IsLoading = true;
+        StatusMessage = $"Удаление интерфейса {AwgConfig.InterfaceName} с роутера...";
+        var (success, msg) = await _vpnService.DeleteAmneziaWgConfigAsync(AwgConfig.InterfaceName);
+        StatusMessage = msg;
+        IsLoading = false;
+
+        if (success)
+        {
+            await LoadAwgConfigsAsync();
+            await ScanCapabilitiesAsync();
+        }
+    }
+
+    [RelayCommand]
+    public async Task RestartAwgConfigAsync()
+    {
+        if (!_ssh.IsConnected) return;
+        if (string.IsNullOrWhiteSpace(AwgConfig.InterfaceName)) return;
+
+        IsLoading = true;
+        StatusMessage = $"Перезапуск интерфейса {AwgConfig.InterfaceName}...";
+        var (success, msg) = await _vpnService.RestartAmneziaWgAsync(AwgConfig.InterfaceName);
+        StatusMessage = msg;
+        IsLoading = false;
+
+        if (success)
+        {
+            await LoadAwgConfigsAsync();
         }
     }
 
@@ -115,6 +211,7 @@ public partial class VpnProtocolsViewModel : ObservableObject
 
         if (success)
         {
+            await LoadAwgConfigsAsync();
             await ScanCapabilitiesAsync();
         }
     }

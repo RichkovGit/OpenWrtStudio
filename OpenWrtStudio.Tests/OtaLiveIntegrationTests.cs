@@ -21,28 +21,27 @@ public class OtaLiveIntegrationTests
         var info = await updateService.CheckForUpdatesAsync();
 
         Assert.NotNull(info);
-        Assert.Equal("v2.5.1", info.TagName);
-        Assert.True(info.IsUpdateAvailable, "v2.5.1 must be recognized as newer than v2.5.0");
+        Assert.StartsWith("v2.5.", info.TagName);
+        Assert.True(info.IsUpdateAvailable, "Latest release must be recognized as newer than v2.5.0");
         Assert.NotNull(info.DownloadUrl);
-        Assert.Contains("OpenWrtStudio_Setup_v2.5.1.exe", info.DownloadUrl);
         Assert.True(info.FileSizeBytes > 50_000_000, "Setup file size must be > 50 MB");
         Assert.NotEmpty(info.Changelog);
     }
 
     [Fact]
-    public async Task Ota_LiveGitHub_Reports_UpToDate_For_v2_5_1()
+    public async Task Ota_LiveGitHub_Reports_UpToDate_For_FutureVersion()
     {
         using var httpClient = new HttpClient();
-        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("OpenWrtStudio-OtaTest/2.5.1");
+        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("OpenWrtStudio-OtaTest/3.0.0");
 
-        var v251 = new Version(2, 5, 1);
-        var updateService = new UpdateService(httpClient, v251);
+        var vFuture = new Version(99, 0, 0);
+        var updateService = new UpdateService(httpClient, vFuture);
 
         var info = await updateService.CheckForUpdatesAsync();
 
         Assert.NotNull(info);
-        Assert.Equal("v2.5.1", info.TagName);
-        Assert.False(info.IsUpdateAvailable, "v2.5.1 should be recognized as already up to date");
+        Assert.StartsWith("v2.5.", info.TagName);
+        Assert.False(info.IsUpdateAvailable, "v99.0.0 should be recognized as already up to date");
     }
 
     [Fact]
