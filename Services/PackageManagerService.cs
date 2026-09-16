@@ -177,7 +177,64 @@ public class PackageManagerService : IPackageManagerService
         var pm = await DetectPackageManagerAsync();
         string cmd;
 
-        if (pm == "apk")
+        var lowerName = name.ToLowerInvariant();
+
+        // 1. Specialized handling for community packages absent in default OpenWrt repos
+        if (lowerName.Contains("argon"))
+        {
+            if (pm == "apk")
+            {
+                cmd = "(apk add luci-theme-argon luci-app-argon-config 2>/dev/null) || " +
+                      "(curl -sL -k -o /tmp/luci-theme-argon.apk https://github.com/jerrykuku/luci-theme-argon/releases/download/v2.4.7/luci-theme-argon-2.4.7-r1.apk && " +
+                      "curl -sL -k -o /tmp/luci-app-argon-config.apk https://github.com/jerrykuku/luci-theme-argon/releases/download/v2.4.7/luci-app-argon-config-2.4.7-r1.apk && " +
+                      "apk add --allow-untrusted /tmp/luci-theme-argon.apk /tmp/luci-app-argon-config.apk)";
+            }
+            else
+            {
+                cmd = "(opkg install luci-theme-argon luci-app-argon-config 2>/dev/null) || " +
+                      "(curl -sL -k -o /tmp/luci-theme-argon.ipk https://github.com/jerrykuku/luci-theme-argon/releases/download/v2.4.7/luci-theme-argon_2.4.7_all.ipk && " +
+                      "curl -sL -k -o /tmp/luci-app-argon-config.ipk https://github.com/jerrykuku/luci-theme-argon/releases/download/v2.4.7/luci-app-argon-config_2.4.7_all.ipk && " +
+                      "opkg install /tmp/luci-theme-argon.ipk /tmp/luci-app-argon-config.ipk)";
+            }
+        }
+        else if (lowerName.Contains("diskman"))
+        {
+            if (pm == "apk")
+            {
+                cmd = "apk add parted e2fsprogs smartmontools blkid lsblk luci-compat 2>/dev/null || true; " +
+                      "mkdir -p /tmp/diskman_pkg && cd /tmp/diskman_pkg && " +
+                      "curl -sL -k -o diskman.ipk https://github.com/lisaac/luci-app-diskman/releases/download/v0.2.11/luci-app-diskman_v0.2.11_all.ipk && " +
+                      "tar -zxf diskman.ipk && tar -C / -zxf data.tar.gz";
+            }
+            else
+            {
+                cmd = "opkg update 2>/dev/null || true; " +
+                      "opkg install parted e2fsprogs smartmontools blkid lsblk luci-compat 2>/dev/null || true; " +
+                      "mkdir -p /tmp/diskman_pkg && cd /tmp/diskman_pkg && " +
+                      "curl -sL -k -o diskman.ipk https://github.com/lisaac/luci-app-diskman/releases/download/v0.2.11/luci-app-diskman_v0.2.11_all.ipk && " +
+                      "(opkg install diskman.ipk 2>/dev/null || (tar -zxf diskman.ipk && tar -C / -zxf data.tar.gz))";
+            }
+        }
+        else if (lowerName.Contains("theme-design"))
+        {
+            if (pm == "apk")
+            {
+                cmd = "mkdir -p /tmp/design_pkg && cd /tmp/design_pkg && " +
+                      "curl -sL -k -o design.ipk https://github.com/0x676e67/luci-theme-design/releases/download/v5.8.0-20240106/luci-theme-design_5.8.0-20240106-1_all.ipk && " +
+                      "curl -sL -k -o design_cfg.ipk https://github.com/0x676e67/luci-theme-design/releases/download/v5.8.0-20240106/luci-app-design-config_1.3-20230306_all.ipk && " +
+                      "tar -zxf design.ipk && tar -C / -zxf data.tar.gz && " +
+                      "tar -zxf design_cfg.ipk && tar -C / -zxf data.tar.gz";
+            }
+            else
+            {
+                cmd = "mkdir -p /tmp/design_pkg && cd /tmp/design_pkg && " +
+                      "curl -sL -k -o design.ipk https://github.com/0x676e67/luci-theme-design/releases/download/v5.8.0-20240106/luci-theme-design_5.8.0-20240106-1_all.ipk && " +
+                      "curl -sL -k -o design_cfg.ipk https://github.com/0x676e67/luci-theme-design/releases/download/v5.8.0-20240106/luci-app-design-config_1.3-20230306_all.ipk && " +
+                      "(opkg install design.ipk design_cfg.ipk 2>/dev/null || " +
+                      "(tar -zxf design.ipk && tar -C / -zxf data.tar.gz && tar -zxf design_cfg.ipk && tar -C / -zxf data.tar.gz))";
+            }
+        }
+        else if (pm == "apk")
         {
             if (!string.IsNullOrWhiteSpace(customInstallCmd))
             {
@@ -201,10 +258,28 @@ public class PackageManagerService : IPackageManagerService
                 : $"opkg install {name}";
         }
 
-        var (code, outStr, err) = await _ssh.ExecuteCommandAsync(cmd, 90);
-        return code == 0
-            ? (true, outStr)
-            : (false, string.IsNullOrWhiteSpace(err) ? outStr : err);
+        var (code, outStr, err) = await _ssh.ExecuteCommandAsync(cmd, 120);
+
+        if (code == 0)
+        {
+            // Execute post-install uci-defaults and clear LuCI index cache so themes & apps appear immediately
+            if (lowerName.StartsWith("luci-") || lowerName.Contains("theme") || lowerName.Contains("argon") || lowerName.Contains("diskman"))
+            {
+                await PostInstallLuciCleanupAsync();
+            }
+            return (true, outStr);
+        }
+
+        return (false, string.IsNullOrWhiteSpace(err) ? outStr : err);
+    }
+
+    private async Task PostInstallLuciCleanupAsync()
+    {
+        var cleanupScript = "for f in /etc/uci-defaults/*; do [ -f \"$f\" ] && ( sh \"$f\" 2>/dev/null || . \"$f\" 2>/dev/null ) && rm -f \"$f\" 2>/dev/null; done; " +
+                            "rm -rf /tmp/luci-indexcache /tmp/luci-modulecache/ 2>/dev/null; " +
+                            "/etc/init.d/rpcd restart 2>/dev/null || true; " +
+                            "/etc/init.d/uhttpd restart 2>/dev/null || true";
+        await _ssh.ExecuteCommandAsync(cleanupScript, 30);
     }
 
     public async Task<(bool Success, string Output)> RemovePackageAsync(string name)

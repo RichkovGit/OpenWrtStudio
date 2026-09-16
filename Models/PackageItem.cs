@@ -1,21 +1,47 @@
-using System.Collections.Generic;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace OpenWrtStudio.Models;
 
-public class PackageItem
+public partial class PackageItem : ObservableObject
 {
-    public string Name { get; set; } = "";
-    public string Version { get; set; } = "";
-    public string Description { get; set; } = "";
-    public string Category { get; set; } = "Общие";
-    public bool IsInstalled { get; set; }
-    public string? InstalledVersion { get; set; }
-    public string Size { get; set; } = "";
-    public bool IsCurated { get; set; }
-    public string Icon { get; set; } = "Apps24";
-    public string? InstallCommand { get; set; }
-    public string? RepoUrl { get; set; }
-    public bool IsBusy { get; set; }
+    [ObservableProperty]
+    private string _name = "";
+
+    [ObservableProperty]
+    private string _version = "";
+
+    [ObservableProperty]
+    private string _description = "";
+
+    [ObservableProperty]
+    private string _category = "Общие";
+
+    [ObservableProperty]
+    private bool _isInstalled;
+
+    [ObservableProperty]
+    private string? _installedVersion;
+
+    [ObservableProperty]
+    private string _size = "";
+
+    [ObservableProperty]
+    private bool _isCurated;
+
+    [ObservableProperty]
+    private string _icon = "Apps24";
+
+    [ObservableProperty]
+    private string? _installCommand;
+
+    [ObservableProperty]
+    private string? _repoUrl;
+
+    [ObservableProperty]
+    private bool _isBusy;
+
+    [ObservableProperty]
+    private string _buttonText = "Установить в 1 клик";
 }
 
 public class CustomFeed

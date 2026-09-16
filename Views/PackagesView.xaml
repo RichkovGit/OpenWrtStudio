@@ -59,9 +59,9 @@
 
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                         <StackPanel>
-                            <ui:InfoBar Title="Статус поиска" Message="{Binding StatusMessage}" 
-                                        IsOpen="{Binding StatusMessage, Converter={StaticResource BooleanToVisibilityConverter}}" 
-                                        Severity="Informational" Margin="0,0,0,14" />
+                            <ui:InfoBar Title="Статус" Message="{Binding StatusMessage}" 
+                                        IsOpen="{Binding HasStatusMessage}" 
+                                        Severity="{Binding StatusSeverity}" Margin="0,0,0,14" />
 
                             <ItemsControl ItemsSource="{Binding OnlineSearchResults}">
                                 <ItemsControl.ItemsPanel>
@@ -99,17 +99,29 @@
                                                     </StackPanel>
                                                 </StackPanel>
 
-                                                <TextBlock Grid.Column="2" Text="{Binding Version}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Top" />
+                                                <!-- Status Tag -->
+                                                <Border Grid.Column="2" CornerRadius="4" Padding="6,2" VerticalAlignment="Top"
+                                                        Background="#10B981"
+                                                        Visibility="{Binding IsInstalled, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                    <TextBlock Text="Установлен" Foreground="White" FontWeight="SemiBold" FontSize="11" />
+                                                </Border>
+                                                <TextBlock Grid.Column="2" Text="{Binding Version}" FontSize="11" 
+                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Top"
+                                                           Visibility="{Binding IsInstalled, Converter={StaticResource InverseBooleanToVisibilityConverter}}" />
 
                                                 <!-- Description -->
                                                 <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding Description}" 
                                                            TextWrapping="Wrap" Margin="0,6,0,0" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
                                                 <!-- Action Button -->
-                                                <ui:Button Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,6,0,0" HorizontalAlignment="Right"
-                                                           Appearance="Primary" Content="Установить на роутер" 
-                                                           Command="{Binding DataContext.InstallOnlinePackageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                           CommandParameter="{Binding}" />
+                                                <StackPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+                                                    <ui:ProgressRing IsIndeterminate="True" Width="18" Height="18" Margin="0,0,8,0"
+                                                                     Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                                    <ui:Button Appearance="Primary" Content="{Binding ButtonText}" 
+                                                               IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}"
+                                                               Command="{Binding DataContext.InstallOnlinePackageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                               CommandParameter="{Binding}" />
+                                                </StackPanel>
                                             </Grid>
                                         </ui:Card>
                                     </DataTemplate>
@@ -167,10 +179,14 @@
                                                        TextWrapping="Wrap" Margin="0,6,0,0" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
                                             <!-- Action Button -->
-                                            <ui:Button Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,6,0,0" HorizontalAlignment="Right"
-                                                       Appearance="Primary" Content="Установить в 1 клик" 
-                                                       Command="{Binding DataContext.InstallPackageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                       CommandParameter="{Binding}" />
+                                            <StackPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+                                                <ui:ProgressRing IsIndeterminate="True" Width="18" Height="18" Margin="0,0,8,0"
+                                                                 Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                                <ui:Button Appearance="Primary" Content="{Binding ButtonText}" 
+                                                           IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}"
+                                                           Command="{Binding DataContext.InstallPackageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                           CommandParameter="{Binding}" />
+                                            </StackPanel>
                                         </Grid>
                                     </ui:Card>
                                 </DataTemplate>

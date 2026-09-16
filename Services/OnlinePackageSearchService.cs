@@ -7,18 +7,44 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using OpenWrtStudio.Models;
 
+using CommunityToolkit.Mvvm.ComponentModel;
+
 namespace OpenWrtStudio.Services;
 
-public class OnlinePackageItem
+public partial class OnlinePackageItem : ObservableObject
 {
-    public string Name { get; set; } = "";
-    public string Version { get; set; } = "";
-    public string Description { get; set; } = "";
-    public string SourceRepo { get; set; } = "Официальный OpenWrt";
-    public string Category { get; set; } = "Сеть";
-    public string RepoUrl { get; set; } = "";
-    public string InstallCommand { get; set; } = "";
-    public bool IsCurated { get; set; }
+    [ObservableProperty]
+    private string _name = "";
+
+    [ObservableProperty]
+    private string _version = "";
+
+    [ObservableProperty]
+    private string _description = "";
+
+    [ObservableProperty]
+    private string _sourceRepo = "Официальный OpenWrt";
+
+    [ObservableProperty]
+    private string _category = "Сеть";
+
+    [ObservableProperty]
+    private string _repoUrl = "";
+
+    [ObservableProperty]
+    private string _installCommand = "";
+
+    [ObservableProperty]
+    private bool _isCurated;
+
+    [ObservableProperty]
+    private bool _isInstalled;
+
+    [ObservableProperty]
+    private bool _isBusy;
+
+    [ObservableProperty]
+    private string _buttonText = "Установить на роутер";
 }
 
 public interface IOnlinePackageSearchService

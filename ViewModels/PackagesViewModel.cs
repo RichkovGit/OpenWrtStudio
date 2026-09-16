@@ -39,6 +39,19 @@ public partial class PackagesViewModel : ObservableObject
     [ObservableProperty]
     private string _statusMessage = "";
 
+    [ObservableProperty]
+    private bool _hasStatusMessage;
+
+    [ObservableProperty]
+    private Wpf.Ui.Controls.InfoBarSeverity _statusSeverity = Wpf.Ui.Controls.InfoBarSeverity.Informational;
+
+    private void SetStatus(string message, Wpf.Ui.Controls.InfoBarSeverity severity = Wpf.Ui.Controls.InfoBarSeverity.Informational)
+    {
+        StatusMessage = message;
+        StatusSeverity = severity;
+        HasStatusMessage = !string.IsNullOrWhiteSpace(message);
+    }
+
     // Feed creation
     [ObservableProperty]
     private string _newFeedName = "";
@@ -104,19 +117,19 @@ public partial class PackagesViewModel : ObservableObject
     public async Task SearchOnlineAsync()
     {
         IsSearching = true;
-        StatusMessage = string.IsNullOrWhiteSpace(SearchQuery)
+        SetStatus(string.IsNullOrWhiteSpace(SearchQuery)
             ? "Загрузка глобального интернет-каталога плагинов и репозиториев..."
-            : $"Поиск '{SearchQuery}' в интернете и репозиториях OpenWrt/ForkOP...";
+            : $"Поиск '{SearchQuery}' в интернете и репозиториях OpenWrt/ForkOP...", Wpf.Ui.Controls.InfoBarSeverity.Informational);
 
         try
         {
             var results = await _onlineSearchService.SearchOnlineAsync(SearchQuery);
             OnlineSearchResults = new ObservableCollection<OnlinePackageItem>(results);
-            StatusMessage = $"Найдено пакетов: {OnlineSearchResults.Count}";
+            SetStatus($"Найдено пакетов: {OnlineSearchResults.Count}", Wpf.Ui.Controls.InfoBarSeverity.Informational);
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Ошибка поиска: {ex.Message}";
+            SetStatus($"Ошибка поиска: {ex.Message}", Wpf.Ui.Controls.InfoBarSeverity.Error);
         }
         finally
         {
@@ -129,17 +142,35 @@ public partial class PackagesViewModel : ObservableObject
     {
         if (pkg == null || !_ssh.IsConnected) return;
 
-        StatusMessage = $"Установка {pkg.Name} из {pkg.SourceRepo}... Пожалуйста, подождите.";
-        var (success, output) = await _pkgService.InstallPackageAsync(pkg.Name, pkg.InstallCommand);
+        pkg.IsBusy = true;
+        pkg.ButtonText = "Установка...";
+        SetStatus($"Установка {pkg.Name} из {pkg.SourceRepo}... Пожалуйста, подождите.", Wpf.Ui.Controls.InfoBarSeverity.Informational);
 
-        if (success)
+        try
         {
-            StatusMessage = $"Пакет {pkg.Name} успешно установлен!";
-            await LoadCuratedAsync();
+            var (success, output) = await _pkgService.InstallPackageAsync(pkg.Name, pkg.InstallCommand);
+
+            if (success)
+            {
+                pkg.IsInstalled = true;
+                pkg.ButtonText = "Установлен";
+                SetStatus($"Пакет {pkg.Name} успешно установлен и активирован в LuCI! Обновите страницу роутера в браузере.", Wpf.Ui.Controls.InfoBarSeverity.Success);
+                await LoadCuratedAsync();
+            }
+            else
+            {
+                pkg.ButtonText = "Повторить";
+                SetStatus($"Ошибка установки {pkg.Name}: {output}", Wpf.Ui.Controls.InfoBarSeverity.Error);
+            }
         }
-        else
+        catch (Exception ex)
         {
-            StatusMessage = $"Ошибка установки {pkg.Name}: {output}";
+            pkg.ButtonText = "Повторить";
+            SetStatus($"Исключение при установке {pkg.Name}: {ex.Message}", Wpf.Ui.Controls.InfoBarSeverity.Error);
+        }
+        finally
+        {
+            pkg.IsBusy = false;
         }
     }
 
@@ -149,19 +180,33 @@ public partial class PackagesViewModel : ObservableObject
         if (pkg == null || !_ssh.IsConnected) return;
 
         pkg.IsBusy = true;
-        StatusMessage = $"Установка {pkg.Name}... Пожалуйста, подождите.";
+        pkg.ButtonText = "Установка...";
+        SetStatus($"Установка {pkg.Name}... Пожалуйста, подождите.", Wpf.Ui.Controls.InfoBarSeverity.Informational);
 
-        var (success, output) = await _pkgService.InstallPackageAsync(pkg.Name, pkg.InstallCommand);
-        pkg.IsBusy = false;
-
-        if (success)
+        try
         {
-            pkg.IsInstalled = true;
-            StatusMessage = $"Пакет {pkg.Name} успешно установлен!";
+            var (success, output) = await _pkgService.InstallPackageAsync(pkg.Name, pkg.InstallCommand);
+
+            if (success)
+            {
+                pkg.IsInstalled = true;
+                pkg.ButtonText = "Установлен";
+                SetStatus($"Пакет {pkg.Name} успешно установлен и активирован в LuCI! Обновите страницу роутера в браузере.", Wpf.Ui.Controls.InfoBarSeverity.Success);
+            }
+            else
+            {
+                pkg.ButtonText = "Повторить";
+                SetStatus($"Ошибка установки {pkg.Name}: {output}", Wpf.Ui.Controls.InfoBarSeverity.Error);
+            }
         }
-        else
+        catch (Exception ex)
         {
-            StatusMessage = $"Ошибка установки {pkg.Name}: {output}";
+            pkg.ButtonText = "Повторить";
+            SetStatus($"Исключение при установке {pkg.Name}: {ex.Message}", Wpf.Ui.Controls.InfoBarSeverity.Error);
+        }
+        finally
+        {
+            pkg.IsBusy = false;
         }
     }
 

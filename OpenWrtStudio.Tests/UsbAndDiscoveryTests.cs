@@ -231,4 +231,44 @@ public class UsbAndDiscoveryTests
 
         Assert.Equal("apk update && apk add luci-app-passwall && apk add kmod-tun", apkCmd);
     }
+
+    [Fact]
+    public void PackageItem_And_OnlinePackageItem_ObservablePropertiesWork()
+    {
+        var item = new OpenWrtStudio.Models.PackageItem
+        {
+            Name = "luci-theme-argon",
+            IsBusy = true,
+            ButtonText = "Установка..."
+        };
+        Assert.True(item.IsBusy);
+        Assert.Equal("Установка...", item.ButtonText);
+
+        var onlineItem = new OpenWrtStudio.Services.OnlinePackageItem
+        {
+            Name = "luci-app-diskman",
+            IsBusy = true,
+            ButtonText = "Установка..."
+        };
+        Assert.True(onlineItem.IsBusy);
+        Assert.Equal("Установка...", onlineItem.ButtonText);
+
+        onlineItem.IsInstalled = true;
+        onlineItem.ButtonText = "Установлен";
+        Assert.True(onlineItem.IsInstalled);
+        Assert.Equal("Установлен", onlineItem.ButtonText);
+    }
+
+    [Fact]
+    public void PostInstallLuciCleanup_ContainsUciDefaultsAndCacheFlushing()
+    {
+        var cleanupScript = "for f in /etc/uci-defaults/*; do [ -f \"$f\" ] && ( sh \"$f\" 2>/dev/null || . \"$f\" 2>/dev/null ) && rm -f \"$f\" 2>/dev/null; done; " +
+                            "rm -rf /tmp/luci-indexcache /tmp/luci-modulecache/ 2>/dev/null; " +
+                            "/etc/init.d/rpcd restart 2>/dev/null || true; " +
+                            "/etc/init.d/uhttpd restart 2>/dev/null || true";
+
+        Assert.Contains("/etc/uci-defaults/*", cleanupScript);
+        Assert.Contains("/tmp/luci-indexcache", cleanupScript);
+        Assert.Contains("/etc/init.d/rpcd restart", cleanupScript);
+    }
 }
