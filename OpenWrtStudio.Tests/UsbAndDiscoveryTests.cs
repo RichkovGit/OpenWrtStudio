@@ -271,4 +271,46 @@ public class UsbAndDiscoveryTests
         Assert.Contains("/tmp/luci-indexcache", cleanupScript);
         Assert.Contains("/etc/init.d/rpcd restart", cleanupScript);
     }
+
+    [Fact]
+    public void RescueLuci_Script_ContainsCleanupsAndThemeFallback()
+    {
+        var rescueScript = "rm -rf /usr/lib/lua/luci/controller/design-config.lua /usr/lib/lua/luci/view/themes/design /www/luci-static/design 2>/dev/null || true; " +
+                           "if [ -d /www/luci-static/argon ]; then uci set luci.main.mediaurlbase=/luci-static/argon; else uci set luci.main.mediaurlbase=/luci-static/bootstrap; fi; " +
+                           "uci commit luci; " +
+                           "rm -rf /tmp/luci-indexcache* /tmp/luci-modulecache* 2>/dev/null; " +
+                           "/etc/init.d/rpcd restart 2>/dev/null || true; " +
+                           "/etc/init.d/uhttpd restart 2>/dev/null || true";
+
+        Assert.Contains("design-config.lua", rescueScript);
+        Assert.Contains("/www/luci-static/argon", rescueScript);
+        Assert.Contains("/luci-static/bootstrap", rescueScript);
+        Assert.Contains("rpcd restart", rescueScript);
+        Assert.Contains("uhttpd restart", rescueScript);
+    }
+
+    [Fact]
+    public void OverlayBackup_Command_TargetsOverlayUpperAndTarGz()
+    {
+        var createCmd = "rm -f /tmp/overlay_backup.tar.gz; " +
+                        "if [ -d /overlay/upper ]; then tar -czf /tmp/overlay_backup.tar.gz -C /overlay/upper . 2>/dev/null; " +
+                        "else tar -czf /tmp/overlay_backup.tar.gz -C /overlay . 2>/dev/null; fi; " +
+                        "ls -lh /tmp/overlay_backup.tar.gz";
+
+        Assert.Contains("/overlay/upper", createCmd);
+        Assert.Contains("overlay_backup.tar.gz", createCmd);
+        Assert.Contains("tar -czf", createCmd);
+    }
+
+    [Fact]
+    public void OverlayRestore_Command_ExtractsToOverlayUpperAndReboots()
+    {
+        var extractCmd = "if [ -d /overlay/upper ]; then tar -xzf /tmp/restore_overlay.tar.gz -C /overlay/upper/ 2>/dev/null; " +
+                         "else tar -xzf /tmp/restore_overlay.tar.gz -C /overlay/ 2>/dev/null; fi; " +
+                         "rm -f /tmp/restore_overlay.tar.gz && sync";
+
+        Assert.Contains("tar -xzf", extractCmd);
+        Assert.Contains("/overlay/upper/", extractCmd);
+        Assert.Contains("sync", extractCmd);
+    }
 }

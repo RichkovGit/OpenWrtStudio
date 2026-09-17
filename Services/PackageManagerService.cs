@@ -18,6 +18,7 @@ public interface IPackageManagerService
     Task<List<CustomFeed>> GetCustomFeedsAsync();
     Task<(bool Success, string Message)> AddCustomFeedAsync(CustomFeed feed);
     Task<(bool Success, string Message)> RemoveCustomFeedAsync(string feedName);
+    Task<(bool Success, string Message)> RescueLuciAsync();
 }
 
 public class PackageManagerService : IPackageManagerService
@@ -217,22 +218,7 @@ public class PackageManagerService : IPackageManagerService
         }
         else if (lowerName.Contains("theme-design"))
         {
-            if (pm == "apk")
-            {
-                cmd = "mkdir -p /tmp/design_pkg && cd /tmp/design_pkg && " +
-                      "curl -sL -k -o design.ipk https://github.com/0x676e67/luci-theme-design/releases/download/v5.8.0-20240106/luci-theme-design_5.8.0-20240106-1_all.ipk && " +
-                      "curl -sL -k -o design_cfg.ipk https://github.com/0x676e67/luci-theme-design/releases/download/v5.8.0-20240106/luci-app-design-config_1.3-20230306_all.ipk && " +
-                      "tar -zxf design.ipk && tar -C / -zxf data.tar.gz && " +
-                      "tar -zxf design_cfg.ipk && tar -C / -zxf data.tar.gz";
-            }
-            else
-            {
-                cmd = "mkdir -p /tmp/design_pkg && cd /tmp/design_pkg && " +
-                      "curl -sL -k -o design.ipk https://github.com/0x676e67/luci-theme-design/releases/download/v5.8.0-20240106/luci-theme-design_5.8.0-20240106-1_all.ipk && " +
-                      "curl -sL -k -o design_cfg.ipk https://github.com/0x676e67/luci-theme-design/releases/download/v5.8.0-20240106/luci-app-design-config_1.3-20230306_all.ipk && " +
-                      "(opkg install design.ipk design_cfg.ipk 2>/dev/null || " +
-                      "(tar -zxf design.ipk && tar -C / -zxf data.tar.gz && tar -zxf design_cfg.ipk && tar -C / -zxf data.tar.gz))";
-            }
+            return (false, "Тема luci-theme-design устарела (эпоха OpenWrt 18/19 на Lua) и несовместима с современным LuCI в OpenWrt 23.x / 24.x / 25.x (вызывает сбой диспетчера страниц ucode). Используйте официальные современные темы: luci-theme-argon, luci-theme-material или luci-theme-openwrt-2020.");
         }
         else if (pm == "apk")
         {
@@ -349,9 +335,9 @@ public class PackageManagerService : IPackageManagerService
             },
             new()
             {
-                Name = "luci-theme-design",
+                Name = "luci-theme-openwrt-2020",
                 Category = "Темы оформления",
-                Description = "Минималистичный чистый дизайн интерфейса OpenWrt с фокусом на читаемость.",
+                Description = "Официальная современная тема OpenWrt 2020 со светлым адаптивным интерфейсом.",
                 Icon = "StyleGuide24",
                 IsCurated = true
             },
@@ -599,6 +585,29 @@ public class PackageManagerService : IPackageManagerService
         return code == 0
             ? (true, $"Репозиторий {feedName} удален.")
             : (false, $"Ошибка: {err}");
+    }
+
+    public async Task<(bool Success, string Message)> RescueLuciAsync()
+    {
+        if (!_ssh.IsConnected)
+        {
+            return (false, "Роутер не подключен по SSH.");
+        }
+
+        var rescueScript = "rm -rf /usr/lib/lua/luci/controller/design-config.lua /usr/lib/lua/luci/view/themes/design /www/luci-static/design 2>/dev/null || true; " +
+                           "if [ -d /www/luci-static/argon ]; then uci set luci.main.mediaurlbase=/luci-static/argon; else uci set luci.main.mediaurlbase=/luci-static/bootstrap; fi; " +
+                           "uci commit luci; " +
+                           "rm -rf /tmp/luci-indexcache* /tmp/luci-modulecache* 2>/dev/null; " +
+                           "/etc/init.d/rpcd restart 2>/dev/null || true; " +
+                           "/etc/init.d/uhttpd restart 2>/dev/null || true";
+
+        var (code, outStr, err) = await _ssh.ExecuteCommandAsync(rescueScript, 20);
+        if (code == 0)
+        {
+            return (true, "Веб-интерфейс LuCI успешно восстановлен! Несовместимые контроллеры удалены, тема сброшена на рабочую (Argon/Bootstrap). Обновите вкладку в браузере (F5).");
+        }
+
+        return (false, $"Ошибка при восстановлении LuCI: {err}\n{outStr}");
     }
 
     private static string DetermineCategory(string packageName)

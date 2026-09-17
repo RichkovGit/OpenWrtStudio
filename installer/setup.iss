@@ -1,6 +1,6 @@
 ; Script generated for OpenWrt Studio Installer
 #define MyAppName "OpenWrt Studio"
-#define MyAppVersion "2.5.16"
+#define MyAppVersion "2.5.17"
 #define MyAppPublisher "RichkovGit"
 #define MyAppURL "https://github.com/RichkovGit/OpenWrtStudio"
 #define MyAppExeName "OpenWrtStudio.exe"

@@ -272,4 +272,12 @@ public partial class PackagesViewModel : ObservableObject
             StatusMessage = msg;
         }
     }
+
+    [RelayCommand]
+    public async Task RescueLuciAsync()
+    {
+        SetStatus("Восстановление веб-интерфейса LuCI и сброс оформления...", Wpf.Ui.Controls.InfoBarSeverity.Informational);
+        var (success, msg) = await _pkgService.RescueLuciAsync();
+        SetStatus(msg, success ? Wpf.Ui.Controls.InfoBarSeverity.Success : Wpf.Ui.Controls.InfoBarSeverity.Error);
+    }
 }

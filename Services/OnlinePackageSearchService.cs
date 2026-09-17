@@ -320,12 +320,12 @@ public class OnlinePackageSearchService : IOnlinePackageSearchService
             },
             new()
             {
-                Name = "luci-theme-design",
+                Name = "luci-theme-openwrt-2020",
                 Version = "latest",
-                Description = "Элегантная минималистичная тема Design с чистым плоским интерфейсом.",
-                SourceRepo = "0x676e67 GitHub",
+                Description = "Официальная современная светлая тема OpenWrt 2020 с улучшенной адаптивностью.",
+                SourceRepo = "Официальный OpenWrt / LuCI",
                 Category = "Темы LuCI",
-                InstallCommand = "opkg install luci-theme-design",
+                InstallCommand = "opkg install luci-theme-openwrt-2020",
                 IsCurated = true
             },
             new()

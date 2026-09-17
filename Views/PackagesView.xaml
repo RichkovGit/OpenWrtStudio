@@ -25,6 +25,8 @@
             </StackPanel>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon Wrench24}" Content="Восстановить LuCI" 
+                           Command="{Binding RescueLuciCommand}" ToolTip="Сбросить тему на рабочую (Argon/Bootstrap), очистить кэш LuCI и удалить сбойные контроллеры" Margin="0,0,8,0" />
                 <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Content="Обновить списки пакетов" 
                            Command="{Binding UpdateListsCommand}" IsEnabled="{Binding IsUpdating, Converter={StaticResource InverseBooleanConverter}}" />
             </StackPanel>
@@ -136,6 +138,10 @@
             <TabItem Header="Каталог тем и плагинов">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="0,16,0,0">
+                        <ui:InfoBar Title="Статус" Message="{Binding StatusMessage}" 
+                                    IsOpen="{Binding HasStatusMessage}" 
+                                    Severity="{Binding StatusSeverity}" Margin="0,0,0,14" />
+
                         <ItemsControl ItemsSource="{Binding CuratedPackages}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>

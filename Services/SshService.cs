@@ -21,6 +21,8 @@ public interface ISshService
     Task RunStreamingCommandAsync(string command, Action<string> onLineReceived, CancellationToken cancellationToken);
     Task<(bool Success, string Message)> UploadFileContentAsync(string content, string remotePath);
     Task<(bool Success, string Content)> DownloadFileContentAsync(string remotePath);
+    Task<(bool Success, byte[]? Data, string Error)> DownloadBinaryFileAsync(string remotePath);
+    Task<(bool Success, string Message)> UploadBinaryFileAsync(byte[] data, string remotePath);
     Task<(bool Success, string Message)> TestConnectionAsync(ConnectionProfile profile);
 }
 
@@ -286,6 +288,102 @@ public class SshService : ISshService, IDisposable
             catch (Exception ex)
             {
                 return (false, $"Ошибка чтения: {ex.Message}");
+            }
+        });
+    }
+
+    public async Task<(bool Success, byte[]? Data, string Error)> DownloadBinaryFileAsync(string remotePath)
+    {
+        if (!IsConnected || _sshClient == null)
+        {
+            return (false, null, "Роутер не подключен");
+        }
+
+        return await Task.Run<(bool Success, byte[]? Data, string Error)>(() =>
+        {
+            try
+            {
+                if (_sftpClient?.IsConnected == true && _sftpClient.Exists(remotePath))
+                {
+                    using var ms = new MemoryStream();
+                    _sftpClient.DownloadFile(remotePath, ms);
+                    return (true, ms.ToArray(), string.Empty);
+                }
+
+                // Fallback: Read via SSH base64
+                var res = _sshClient.RunCommand($"[ -f '{remotePath}' ] && base64 '{remotePath}' || echo '__FILE_NOT_FOUND__'");
+                var outText = res.Result.Trim();
+                if (outText.Contains("__FILE_NOT_FOUND__"))
+                {
+                    return (false, null, "Указанный файл не найден на роутере");
+                }
+                var cleanB64 = outText.Replace("\n", "").Replace("\r", "").Trim();
+                var bytes = Convert.FromBase64String(cleanB64);
+                return (true, bytes, string.Empty);
+            }
+            catch (Exception ex)
+            {
+                return (false, null, $"Ошибка чтения двоичного файла: {ex.Message}");
+            }
+        });
+    }
+
+    public async Task<(bool Success, string Message)> UploadBinaryFileAsync(byte[] data, string remotePath)
+    {
+        if (!IsConnected || _sshClient == null)
+        {
+            return (false, "Роутер не подключен");
+        }
+
+        return await Task.Run(() =>
+        {
+            try
+            {
+                if (_sftpClient?.IsConnected == true)
+                {
+                    using var ms = new MemoryStream(data);
+                    _sftpClient.UploadFile(ms, remotePath, true);
+                    return (true, $"Файл успешно загружен в {remotePath}");
+                }
+
+                // Fallback: Write via base64
+                var b64 = Convert.ToBase64String(data);
+                if (b64.Length > 60000)
+                {
+                    var tmpB64 = "/tmp/_upload.b64";
+                    _sshClient.RunCommand($"rm -f '{tmpB64}' '{remotePath}'");
+                    int chunkSize = 30000;
+                    for (int i = 0; i < b64.Length; i += chunkSize)
+                    {
+                        var chunk = b64.Substring(i, Math.Min(chunkSize, b64.Length - i));
+                        var appendCmd = $"printf '%s' '{chunk}' >> '{tmpB64}'";
+                        var appendRes = _sshClient.RunCommand(appendCmd);
+                        if (appendRes.ExitStatus != 0)
+                        {
+                            return (false, $"Ошибка передачи фрагмента: {appendRes.Error}");
+                        }
+                    }
+                    var decodeRes = _sshClient.RunCommand($"base64 -d '{tmpB64}' > '{remotePath}' && rm -f '{tmpB64}'");
+                    if (decodeRes.ExitStatus == 0)
+                    {
+                        return (true, $"Файл успешно загружен в {remotePath}");
+                    }
+                    return (false, $"Ошибка декодирования файла: {decodeRes.Error}");
+                }
+                else
+                {
+                    var uploadCmd = $"echo '{b64}' | base64 -d > '{remotePath}'";
+                    var res = _sshClient.RunCommand(uploadCmd);
+                    if (res.ExitStatus == 0)
+                    {
+                        return (true, $"Файл успешно загружен в {remotePath}");
+                    }
+                    return (false, $"Ошибка передачи файла: {res.Error}");
+                }
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Ошибка передачи файла: {ex.Message}");
             }
         });
     }
