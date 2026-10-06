@@ -1,6 +1,6 @@
 ; Script generated for OpenWrt Studio Installer
 #define MyAppName "OpenWrt Studio"
-#define MyAppVersion "2.5.17"
+#define MyAppVersion "2.5.18"
 #define MyAppPublisher "RichkovGit"
 #define MyAppURL "https://github.com/RichkovGit/OpenWrtStudio"
 #define MyAppExeName "OpenWrtStudio.exe"
@@ -44,7 +44,7 @@ Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\Assets\app.ico"; Tasks: desktopicon
 
 [Registry]
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "OpenWrtStudio"; ValueData: """{app}\{#MyAppExeName}"""; Flags: uninsdeletevalue; Tasks: autostart
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "OpenWrtStudio"; ValueData: """{app}\{#MyAppExeName}"" --minimized"; Flags: uninsdeletevalue; Tasks: autostart
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
