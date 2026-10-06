@@ -4,6 +4,7 @@ namespace OpenWrtStudio.Models;
 
 public enum VpnProtocolType
 {
+    Forkop,
     AmneziaWg,
     WireGuard,
     SingBox,

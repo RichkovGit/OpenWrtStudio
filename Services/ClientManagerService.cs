@@ -642,8 +642,10 @@ echo '===SECTION:END==='
 
     public async Task<(bool Success, string Message)> KickClientAsync(string mac)
     {
-        if (string.IsNullOrWhiteSpace(mac)) return (false, "Не указан MAC-адрес");
-        var cleanMac = mac.ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(mac) || !ShellHelper.IsValidMac(mac)) 
+            return (false, "Не указан или некорректен MAC-адрес");
+
+        var cleanMac = mac.Trim().ToLowerInvariant();
         var cmd = $@"
 for h in $(ubus list 'hostapd.*' 2>/dev/null); do
     ubus call ""$h"" del_client '{{\""addr\"":\""{cleanMac}\"",\""deauth\"":true,\""reason\"":1,\""ban_time\"":20000}}' 2>/dev/null
@@ -654,13 +656,16 @@ done
 ";
 
         var (code, outStr, errStr) = await _ssh.ExecuteCommandAsync(cmd, 6);
-        return (code == 0, $"Сессия устройства {mac} сброшена (деавторизация Wi-Fi)");
+        return (code == 0, $"Сессия устройства {cleanMac} сброшена (деавторизация Wi-Fi)");
     }
 
     public async Task<(bool Success, string Message)> BlockClientInternetAsync(string mac, bool block)
     {
-        if (string.IsNullOrWhiteSpace(mac)) return (false, "Не указан MAC-адрес");
-        var cleanMac = mac.Replace(":", "_");
+        if (string.IsNullOrWhiteSpace(mac) || !ShellHelper.IsValidMac(mac)) 
+            return (false, "Не указан или некорректен MAC-адрес");
+
+        var validMac = mac.Trim().ToLowerInvariant();
+        var cleanMac = validMac.Replace(":", "_");
 
         string cmd;
         if (block)
@@ -677,7 +682,7 @@ done
 uci add firewall rule
 uci set firewall.@rule[-1].name='Block_{cleanMac}_dhcp'
 uci set firewall.@rule[-1].src='lan'
-uci set firewall.@rule[-1].src_mac='{mac}'
+uci set firewall.@rule[-1].src_mac='{validMac}'
 uci set firewall.@rule[-1].proto='udp'
 uci set firewall.@rule[-1].dest_port='67 68'
 uci set firewall.@rule[-1].target='ACCEPT'
@@ -686,7 +691,7 @@ uci set firewall.@rule[-1].target='ACCEPT'
 uci add firewall rule
 uci set firewall.@rule[-1].name='Block_{cleanMac}_luci'
 uci set firewall.@rule[-1].src='lan'
-uci set firewall.@rule[-1].src_mac='{mac}'
+uci set firewall.@rule[-1].src_mac='{validMac}'
 uci set firewall.@rule[-1].proto='tcp'
 uci set firewall.@rule[-1].dest_port='80 443'
 uci set firewall.@rule[-1].target='ACCEPT'
@@ -695,7 +700,7 @@ uci set firewall.@rule[-1].target='ACCEPT'
 uci add firewall rule
 uci set firewall.@rule[-1].name='Block_{cleanMac}_input'
 uci set firewall.@rule[-1].src='lan'
-uci set firewall.@rule[-1].src_mac='{mac}'
+uci set firewall.@rule[-1].src_mac='{validMac}'
 uci set firewall.@rule[-1].target='DROP'
 
 # 4. Drop direct WAN traffic
@@ -703,13 +708,13 @@ uci add firewall rule
 uci set firewall.@rule[-1].name='Block_{cleanMac}_wan'
 uci set firewall.@rule[-1].src='lan'
 uci set firewall.@rule[-1].dest='wan'
-uci set firewall.@rule[-1].src_mac='{mac}'
+uci set firewall.@rule[-1].src_mac='{validMac}'
 uci set firewall.@rule[-1].target='DROP'
 
 uci commit firewall
 /etc/init.d/firewall reload
 
-for h in $(ubus list 'hostapd.*' 2>/dev/null); do ubus call ""$h"" del_client '{{\""addr\"":\""{mac}\"",\""deauth\"":true,\""ban_time\"":60000}}' 2>/dev/null; done
+for h in $(ubus list 'hostapd.*' 2>/dev/null); do ubus call ""$h"" del_client '{{\""addr\"":\""{validMac}\"",\""deauth\"":true,\""ban_time\"":60000}}' 2>/dev/null; done
 ";
         }
         else
@@ -726,41 +731,50 @@ uci commit firewall
         }
 
         var (code, outStr, errStr) = await _ssh.ExecuteCommandAsync(cmd, 10);
-        return (code == 0, block ? $"Доступ в интернет (включая VPN/иностранный трафик) заблокирован для {mac}" : $"Доступ в интернет разблокирован для {mac}");
+        return (code == 0, block ? $"Доступ в интернет (включая VPN/иностранный трафик) заблокирован для {validMac}" : $"Доступ в интернет разблокирован для {validMac}");
     }
 
     public async Task<(bool Success, string Message)> SetStaticLeaseAsync(string mac, string ip, string name)
     {
-        if (string.IsNullOrWhiteSpace(mac) || string.IsNullOrWhiteSpace(ip))
-            return (false, "Не указан MAC или IP адрес");
+        if (string.IsNullOrWhiteSpace(mac) || !ShellHelper.IsValidMac(mac))
+            return (false, "Некорректный формат MAC-адреса");
 
-        var cleanName = string.IsNullOrWhiteSpace(name) ? "StaticDevice" : name.Replace(" ", "_");
+        if (string.IsNullOrWhiteSpace(ip) || !ShellHelper.IsValidIp(ip))
+            return (false, "Некорректный формат IPv4 адреса");
+
+        var validMac = mac.Trim().ToLowerInvariant();
+        var validIp = ip.Trim();
+        var cleanName = ShellHelper.SanitizeIdentifier(name, "StaticDevice");
+
         var cmd = $@"
-for s in $(uci show dhcp | grep -i '{mac}' | cut -d'.' -f2 | cut -d'=' -f1 | sort -u); do
+for s in $(uci show dhcp | grep -i '{validMac}' | cut -d'.' -f2 | cut -d'=' -f1 | sort -u); do
     uci delete dhcp.$s 2>/dev/null
 done
 uci add dhcp host
-uci set dhcp.@host[-1].name='{cleanName}'
-uci set dhcp.@host[-1].mac='{mac}'
-uci set dhcp.@host[-1].ip='{ip}'
+uci set dhcp.@host[-1].name={ShellHelper.EscapeArg(cleanName)}
+uci set dhcp.@host[-1].mac={ShellHelper.EscapeArg(validMac)}
+uci set dhcp.@host[-1].ip={ShellHelper.EscapeArg(validIp)}
 uci commit dhcp
 /etc/init.d/dnsmasq reload
 ";
         var (code, outStr, errStr) = await _ssh.ExecuteCommandAsync(cmd, 10);
-        return (code == 0, $"Статический IP {ip} успешно закреплён за {mac}");
+        return (code == 0, $"Статический IP {validIp} успешно закреплён за {validMac}");
     }
 
     public async Task<(bool Success, string Message)> DeleteStaticLeaseAsync(string mac)
     {
-        if (string.IsNullOrWhiteSpace(mac)) return (false, "Не указан MAC");
+        if (string.IsNullOrWhiteSpace(mac) || !ShellHelper.IsValidMac(mac)) 
+            return (false, "Некорректный формат MAC-адреса");
+
+        var validMac = mac.Trim().ToLowerInvariant();
         var cmd = $@"
-for s in $(uci show dhcp | grep -i '{mac}' | cut -d'.' -f2 | cut -d'=' -f1 | sort -u); do
+for s in $(uci show dhcp | grep -i '{validMac}' | cut -d'.' -f2 | cut -d'=' -f1 | sort -u); do
     uci delete dhcp.$s 2>/dev/null
 done
 uci commit dhcp
 /etc/init.d/dnsmasq reload
 ";
         var (code, outStr, errStr) = await _ssh.ExecuteCommandAsync(cmd, 10);
-        return (code == 0, $"Фиксация статического IP удалена для {mac}");
+        return (code == 0, $"Фиксация статического IP удалена для {validMac}");
     }
 }

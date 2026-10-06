@@ -176,15 +176,18 @@ ps
     {
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
 
-        var cmd = $"opkg update && opkg install --force-depends {packageName}";
+        var cleanPkg = ShellHelper.SanitizeIdentifier(packageName);
+        if (string.IsNullOrWhiteSpace(cleanPkg)) return (false, "Некорректное имя пакета");
+
+        var cmd = $"opkg update && opkg install --force-depends {cleanPkg}";
         var (code, outStr, err) = await _ssh.ExecuteCommandAsync(cmd, 60);
 
         if (code == 0 || outStr.Contains("Installing") || outStr.Contains("Configuring"))
         {
-            return (true, $"Пакет {packageName} успешно установлен!\n{outStr}");
+            return (true, $"Пакет {cleanPkg} успешно установлен!\n{outStr}");
         }
 
-        return (false, $"Ошибка установки пакета {packageName}: {err}\n{outStr}");
+        return (false, $"Ошибка установки пакета {cleanPkg}: {err}\n{outStr}");
     }
 
     public async Task<ForkopDiagResult> RunDiagnosticsAsync()
@@ -342,26 +345,26 @@ nslookup rutracker.org 127.0.0.1 >/dev/null 2>&1 && echo 'blocked_dns:ok' || ech
             sb.AppendLine("uci -q delete forkop.vpn_proxy 2>/dev/null || true");
             sb.AppendLine("uci set forkop.vpn_proxy=section");
             sb.AppendLine($"uci set forkop.vpn_proxy.enabled='{(section.IsEnabled ? "1" : "0")}'");
-            sb.AppendLine($"uci set forkop.vpn_proxy.name='{section.Name.Replace("'", "\\'")}'");
-            sb.AppendLine($"uci set forkop.vpn_proxy.action='{section.Action}'");
-            sb.AppendLine($"uci set forkop.vpn_proxy.interface='{section.SelectedInterface}'");
+            sb.AppendLine($"uci set forkop.vpn_proxy.name={ShellHelper.EscapeArg(section.Name)}");
+            sb.AppendLine($"uci set forkop.vpn_proxy.action={ShellHelper.EscapeArg(section.Action)}");
+            sb.AppendLine($"uci set forkop.vpn_proxy.interface={ShellHelper.EscapeArg(section.SelectedInterface)}");
 
             foreach (var url in section.SubscriptionUrls)
             {
                 if (!string.IsNullOrWhiteSpace(url))
-                    sb.AppendLine($"uci add_list forkop.vpn_proxy.sub_url='{url.Replace("'", "\\'")}'");
+                    sb.AppendLine($"uci add_list forkop.vpn_proxy.sub_url={ShellHelper.EscapeArg(url)}");
             }
 
             foreach (var conn in section.ConnectionUrls)
             {
                 if (!string.IsNullOrWhiteSpace(conn))
-                    sb.AppendLine($"uci add_list forkop.vpn_proxy.conn_url='{conn.Replace("'", "\\'")}'");
+                    sb.AppendLine($"uci add_list forkop.vpn_proxy.conn_url={ShellHelper.EscapeArg(conn)}");
             }
 
             foreach (var rule in section.Rulesets)
             {
                 if (!string.IsNullOrWhiteSpace(rule))
-                    sb.AppendLine($"uci add_list forkop.vpn_proxy.ruleset='{rule.Replace("'", "\\'")}'");
+                    sb.AppendLine($"uci add_list forkop.vpn_proxy.ruleset={ShellHelper.EscapeArg(rule)}");
             }
 
             sb.AppendLine("uci commit forkop");
@@ -997,15 +1000,17 @@ cat /etc/mihomo/run/config.yaml 2>/dev/null || cat /etc/mihomo/config.yaml 2>/de
             try
             {
                 var targetName = !string.IsNullOrWhiteSpace(server.GroupTag) ? server.GroupTag : server.Name;
-                var safeTarget = targetName.Replace("'", "\\'").Replace("\"", "\\\"");
+                var safeTargetArg = ShellHelper.EscapeArg(targetName);
+                var jsonBody = System.Text.Json.JsonSerializer.Serialize(new { name = targetName });
+                var safeJsonArg = ShellHelper.EscapeArg(jsonBody);
 
                 var sb = new System.Text.StringBuilder();
                 // 1. Clash API live runtime switch
-                sb.AppendLine($"/usr/bin/forkop clash_api set_group_proxy main-priority-main_priority-out '{safeTarget}' 2>/dev/null || true");
-                sb.AppendLine($"/usr/bin/forkop clash_api set_group_proxy main-out '{safeTarget}' 2>/dev/null || true");
-                sb.AppendLine($"curl -s -X PUT http://192.168.10.1:9090/proxies/main-priority-main_priority-out -d '{{\"name\":\"{safeTarget}\"}}' 2>/dev/null || true");
+                sb.AppendLine($"/usr/bin/forkop clash_api set_group_proxy main-priority-main_priority-out {safeTargetArg} 2>/dev/null || true");
+                sb.AppendLine($"/usr/bin/forkop clash_api set_group_proxy main-out {safeTargetArg} 2>/dev/null || true");
+                sb.AppendLine($"curl -s -X PUT http://127.0.0.1:9090/proxies/main-priority-main_priority-out -H 'Content-Type: application/json' -d {safeJsonArg} 2>/dev/null || true");
                 // 2. UCI persistent configuration
-                sb.AppendLine($"uci set forkop.vpn_proxy.selected_node='{safeTarget}' 2>/dev/null || true");
+                sb.AppendLine($"uci set forkop.vpn_proxy.selected_node={safeTargetArg} 2>/dev/null || true");
                 sb.AppendLine("uci commit forkop 2>/dev/null || true");
 
                 await _ssh.ExecuteCommandAsync(sb.ToString(), 5);

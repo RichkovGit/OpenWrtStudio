@@ -43,6 +43,15 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _themeStatusText = "";
 
+    [ObservableProperty]
+    private bool _startMinimizedToTray;
+
+    partial void OnStartMinimizedToTrayChanged(bool value)
+    {
+        _themeService.StartMinimizedToTray = value;
+        _themeService.SavePreferences();
+    }
+
     // OTA Updates
     [ObservableProperty]
     private UpdateInfo? _updateInfo;
@@ -99,6 +108,8 @@ public partial class SettingsViewModel : ObservableObject
         {
             t.IsSelected = t.Id == SelectedColorTheme?.Id;
         }
+
+        StartMinimizedToTray = _themeService.StartMinimizedToTray;
 
         if (AutoCheckUpdates)
         {

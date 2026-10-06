@@ -24,3 +24,7 @@ test-results/
 TestResults/
 *.tmp
 *.bak
+release_artifacts/
+temp_portable/
+__pycache__/
+scripts/__pycache__/

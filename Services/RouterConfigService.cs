@@ -104,20 +104,22 @@ public class RouterConfigService : IRouterConfigService
         var sb = new StringBuilder();
         foreach (var r in radios)
         {
-            sb.AppendLine($"uci set wireless.{r.Device}.channel='{r.Channel}'");
-            sb.AppendLine($"uci set wireless.{r.Device}.htmode='{r.HtMode}'");
-            sb.AppendLine($"uci set wireless.{r.Device}.disabled='{(r.Disabled ? 1 : 0)}'");
+            var cleanDev = ShellHelper.SanitizeIdentifier(r.Device, "radio0");
+            sb.AppendLine($"uci set wireless.{cleanDev}.channel={ShellHelper.EscapeArg(r.Channel)}");
+            sb.AppendLine($"uci set wireless.{cleanDev}.htmode={ShellHelper.EscapeArg(r.HtMode)}");
+            sb.AppendLine($"uci set wireless.{cleanDev}.disabled='{(r.Disabled ? 1 : 0)}'");
 
             foreach (var iface in r.Interfaces)
             {
-                var id = string.IsNullOrWhiteSpace(iface.SectionId) ? $"default_{r.Device}" : iface.SectionId;
-                sb.AppendLine($"uci set wireless.{id}.ssid='{iface.Ssid}'");
-                sb.AppendLine($"uci set wireless.{id}.encryption='{iface.Encryption}'");
+                var rawId = string.IsNullOrWhiteSpace(iface.SectionId) ? $"default_{cleanDev}" : iface.SectionId;
+                var cleanId = ShellHelper.SanitizeIdentifier(rawId, $"default_{cleanDev}");
+                sb.AppendLine($"uci set wireless.{cleanId}.ssid={ShellHelper.EscapeArg(iface.Ssid)}");
+                sb.AppendLine($"uci set wireless.{cleanId}.encryption={ShellHelper.EscapeArg(iface.Encryption)}");
                 if (!string.IsNullOrWhiteSpace(iface.Key))
                 {
-                    sb.AppendLine($"uci set wireless.{id}.key='{iface.Key}'");
+                    sb.AppendLine($"uci set wireless.{cleanId}.key={ShellHelper.EscapeArg(iface.Key)}");
                 }
-                sb.AppendLine($"uci set wireless.{id}.disabled='{(iface.Disabled ? 1 : 0)}'");
+                sb.AppendLine($"uci set wireless.{cleanId}.disabled='{(iface.Disabled ? 1 : 0)}'");
             }
         }
 
@@ -186,11 +188,11 @@ public class RouterConfigService : IRouterConfigService
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
 
         var sb = new StringBuilder();
-        sb.AppendLine($"uci set network.lan.ipaddr='{config.IpAddress}'");
-        sb.AppendLine($"uci set network.lan.netmask='{config.Netmask}'");
-        sb.AppendLine($"uci set dhcp.lan.start='{config.DhcpStart}'");
-        sb.AppendLine($"uci set dhcp.lan.limit='{config.DhcpLimit}'");
-        sb.AppendLine($"uci set dhcp.lan.leasetime='{config.LeaseTime}'");
+        sb.AppendLine($"uci set network.lan.ipaddr={ShellHelper.EscapeArg(config.IpAddress)}");
+        sb.AppendLine($"uci set network.lan.netmask={ShellHelper.EscapeArg(config.Netmask)}");
+        sb.AppendLine($"uci set dhcp.lan.start='{Math.Clamp(config.DhcpStart, 1, 254)}'");
+        sb.AppendLine($"uci set dhcp.lan.limit='{Math.Clamp(config.DhcpLimit, 1, 254)}'");
+        sb.AppendLine($"uci set dhcp.lan.leasetime={ShellHelper.EscapeArg(string.IsNullOrWhiteSpace(config.LeaseTime) ? "12h" : config.LeaseTime)}");
 
         sb.AppendLine("uci commit network");
         sb.AppendLine("uci commit dhcp");
@@ -224,21 +226,22 @@ public class RouterConfigService : IRouterConfigService
     {
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
 
+        var proto = ShellHelper.SanitizeIdentifier(config.Proto, "dhcp");
         var sb = new StringBuilder();
-        sb.AppendLine($"uci set network.wan.proto='{config.Proto}'");
+        sb.AppendLine($"uci set network.wan.proto={ShellHelper.EscapeArg(proto)}");
 
-        if (config.Proto.Equals("pppoe", StringComparison.OrdinalIgnoreCase))
+        if (proto.Equals("pppoe", StringComparison.OrdinalIgnoreCase))
         {
-            sb.AppendLine($"uci set network.wan.username='{config.PppoeUsername}'");
-            sb.AppendLine($"uci set network.wan.password='{config.PppoePassword}'");
-            sb.AppendLine($"uci set network.wan.mtu='{config.Mtu}'");
+            sb.AppendLine($"uci set network.wan.username={ShellHelper.EscapeArg(config.PppoeUsername)}");
+            sb.AppendLine($"uci set network.wan.password={ShellHelper.EscapeArg(config.PppoePassword)}");
+            sb.AppendLine($"uci set network.wan.mtu={ShellHelper.EscapeArg(config.Mtu > 0 ? config.Mtu.ToString() : "1492")}");
         }
-        else if (config.Proto.Equals("static", StringComparison.OrdinalIgnoreCase))
+        else if (proto.Equals("static", StringComparison.OrdinalIgnoreCase))
         {
-            sb.AppendLine($"uci set network.wan.ipaddr='{config.StaticIp}'");
-            sb.AppendLine($"uci set network.wan.netmask='{config.StaticNetmask}'");
-            sb.AppendLine($"uci set network.wan.gateway='{config.StaticGateway}'");
-            sb.AppendLine($"uci set network.wan.dns='{config.StaticDns}'");
+            sb.AppendLine($"uci set network.wan.ipaddr={ShellHelper.EscapeArg(config.StaticIp)}");
+            sb.AppendLine($"uci set network.wan.netmask={ShellHelper.EscapeArg(config.StaticNetmask)}");
+            sb.AppendLine($"uci set network.wan.gateway={ShellHelper.EscapeArg(config.StaticGateway)}");
+            sb.AppendLine($"uci set network.wan.dns={ShellHelper.EscapeArg(config.StaticDns)}");
         }
 
         sb.AppendLine("uci commit network");
@@ -287,7 +290,8 @@ public class RouterConfigService : IRouterConfigService
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
 
         var sb = new StringBuilder();
-        var sec = string.IsNullOrWhiteSpace(rule.SectionId) ? "" : rule.SectionId;
+        var rawSec = string.IsNullOrWhiteSpace(rule.SectionId) ? "" : rule.SectionId;
+        var sec = string.IsNullOrWhiteSpace(rawSec) ? "" : ShellHelper.SanitizeIdentifier(rawSec);
 
         if (string.IsNullOrWhiteSpace(sec))
         {
@@ -299,13 +303,13 @@ public class RouterConfigService : IRouterConfigService
             sb.AppendLine($"SEC={sec}");
         }
 
-        sb.AppendLine($"uci set firewall.$SEC.name='{rule.Name}'");
+        sb.AppendLine($"uci set firewall.$SEC.name={ShellHelper.EscapeArg(rule.Name)}");
         sb.AppendLine("uci set firewall.$SEC.src='wan'");
         sb.AppendLine("uci set firewall.$SEC.dest='lan'");
-        sb.AppendLine($"uci set firewall.$SEC.proto='{rule.Proto}'");
-        sb.AppendLine($"uci set firewall.$SEC.src_dport='{rule.SrcPort}'");
-        sb.AppendLine($"uci set firewall.$SEC.dest_ip='{rule.DestIp}'");
-        sb.AppendLine($"uci set firewall.$SEC.dest_port='{rule.DestPort}'");
+        sb.AppendLine($"uci set firewall.$SEC.proto={ShellHelper.EscapeArg(rule.Proto)}");
+        sb.AppendLine($"uci set firewall.$SEC.src_dport={ShellHelper.EscapeArg(rule.SrcPort)}");
+        sb.AppendLine($"uci set firewall.$SEC.dest_ip={ShellHelper.EscapeArg(rule.DestIp)}");
+        sb.AppendLine($"uci set firewall.$SEC.dest_port={ShellHelper.EscapeArg(rule.DestPort)}");
         sb.AppendLine("uci set firewall.$SEC.target='DNAT'");
         sb.AppendLine($"uci set firewall.$SEC.enabled='{(rule.Enabled ? 1 : 0)}'");
         sb.AppendLine("uci commit firewall");
@@ -320,7 +324,8 @@ public class RouterConfigService : IRouterConfigService
     {
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
 
-        var cmd = $"uci -q delete firewall.{sectionId}; uci commit firewall; /etc/init.d/firewall restart";
+        var cleanSec = ShellHelper.SanitizeIdentifier(sectionId);
+        var cmd = $"uci -q delete firewall.{cleanSec}; uci commit firewall; /etc/init.d/firewall restart";
         var (code, _, err) = await _ssh.ExecuteCommandAsync(cmd, 10);
         if (code == 0) return (true, "Правило успешно удалено!");
         return (false, $"Ошибка удаления: {err}");
@@ -345,14 +350,15 @@ public class RouterConfigService : IRouterConfigService
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
 
         var sb = new StringBuilder();
-        sb.AppendLine($"uci set system.@system[0].hostname='{config.Hostname}'");
-        sb.AppendLine($"uci set system.@system[0].timezone='{config.Timezone}'");
+        sb.AppendLine($"uci set system.@system[0].hostname={ShellHelper.EscapeArg(config.Hostname)}");
+        sb.AppendLine($"uci set system.@system[0].timezone={ShellHelper.EscapeArg(config.Timezone)}");
         sb.AppendLine("uci commit system");
         sb.AppendLine("/etc/init.d/system restart");
 
         if (!string.IsNullOrWhiteSpace(config.NewPassword))
         {
-            sb.AppendLine($"echo -e \"{config.NewPassword}\\n{config.NewPassword}\" | passwd root 2>/dev/null");
+            var escPass = ShellHelper.EscapeArg(config.NewPassword);
+            sb.AppendLine($"printf '%s\\n%s\\n' {escPass} {escPass} | passwd root 2>/dev/null");
         }
 
         var (code, outStr, err) = await _ssh.ExecuteCommandAsync(sb.ToString(), 10);

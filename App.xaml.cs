@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,6 +16,7 @@ public partial class App : Application
 
     public App()
     {
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
 
@@ -159,10 +161,31 @@ public partial class App : Application
             var bgMonitor = _serviceProvider.GetRequiredService<IBackgroundMonitorService>();
 
             mainWindow.DataContext = mainViewModel;
-            mainWindow.Show();
+
+            // Check if application should start minimized to system tray
+            bool startMinimized = (e.Args != null && e.Args.Any(a => a.Equals("--minimized", StringComparison.OrdinalIgnoreCase)
+                                                                   || a.Equals("-m", StringComparison.OrdinalIgnoreCase)
+                                                                   || a.Equals("--tray", StringComparison.OrdinalIgnoreCase)
+                                                                   || a.Equals("/minimized", StringComparison.OrdinalIgnoreCase)
+                                                                   || a.Equals("/tray", StringComparison.OrdinalIgnoreCase)))
+                                  || themeService.StartMinimizedToTray;
 
             // Initialize System Tray and Background Monitor
             trayManager.Initialize(mainWindow);
+
+            if (startMinimized)
+            {
+                mainWindow.WindowState = WindowState.Minimized;
+                trayManager.ShowBalloonTip(
+                    "OpenWrt Studio",
+                    "Приложение запущено свернутым в системный трей и продолжает мониторинг в фоне.",
+                    Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info);
+            }
+            else
+            {
+                mainWindow.Show();
+            }
+
             bgMonitor.StartMonitoring(25);
             bgMonitor.OnRouterStatePolled += info =>
             {

@@ -368,9 +368,10 @@ echo '===SECTION:END==='
 
     public async Task<(bool Success, string Message)> RestartServiceAsync(string serviceName)
     {
-        var (code, _, err) = await _ssh.ExecuteCommandAsync($"/etc/init.d/{serviceName} restart", 15);
+        var cleanService = ShellHelper.SanitizeIdentifier(serviceName);
+        var (code, _, err) = await _ssh.ExecuteCommandAsync($"/etc/init.d/{cleanService} restart", 15);
         return code == 0
-            ? (true, $"Служба {serviceName} успешно перезапущена!")
-            : (false, $"Ошибка перезапуска службы {serviceName}: {err}");
+            ? (true, $"Служба {cleanService} успешно перезапущена!")
+            : (false, $"Ошибка перезапуска службы {cleanService}: {err}");
     }
 }

@@ -277,7 +277,7 @@ public class MihomoConfigService : IMihomoConfigService
         }
 
         // 1. Backup old config if exists
-        await _ssh.ExecuteCommandAsync($"cp {remotePath} {remotePath}.bak 2>/dev/null", 5);
+        await _ssh.ExecuteCommandAsync($"cp {ShellHelper.EscapeArg(remotePath)} {ShellHelper.EscapeArg(remotePath + ".bak")} 2>/dev/null", 5);
 
         // 2. Upload file via SFTP
         var (uploadSuccess, uploadMsg) = await _ssh.UploadFileContentAsync(yamlContent, remotePath);
@@ -361,19 +361,25 @@ public class MihomoConfigService : IMihomoConfigService
     public async Task<(bool Success, string Message)> UpdateSubscriptionOnRouterAsync(string providerName, string subUrl)
     {
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
-        if (string.IsNullOrWhiteSpace(providerName)) providerName = "my-subscription";
-        providerName = providerName.Trim().Replace(" ", "-");
+
+        if (string.IsNullOrWhiteSpace(subUrl) || (!subUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !subUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+        {
+            return (false, "Некорректная ссылка на подписку (должна начинаться с http:// или https://)");
+        }
+
+        var cleanName = ShellHelper.SanitizeIdentifier(providerName, "my-subscription");
+        var escUrl = ShellHelper.EscapeArg(subUrl.Trim());
 
         var cmd = $"mkdir -p /etc/mihomo/proxy_providers /etc/openwrt-mihomo/proxy_providers 2>/dev/null; " +
-                  $"curl -fsSL -k \"{subUrl.Trim()}\" -o /etc/mihomo/proxy_providers/{providerName}.yaml || " +
-                  $"wget -q -O /etc/mihomo/proxy_providers/{providerName}.yaml \"{subUrl.Trim()}\"; " +
-                  $"ls -lh /etc/mihomo/proxy_providers/{providerName}.yaml 2>/dev/null";
+                  $"curl -fsSL -k {escUrl} -o /etc/mihomo/proxy_providers/{cleanName}.yaml || " +
+                  $"wget -q -O /etc/mihomo/proxy_providers/{cleanName}.yaml {escUrl}; " +
+                  $"ls -lh /etc/mihomo/proxy_providers/{cleanName}.yaml 2>/dev/null";
 
         var (code, outStr, err) = await _ssh.ExecuteCommandAsync(cmd, 25);
-        if (code == 0 && outStr.Contains(providerName))
+        if (code == 0 && outStr.Contains(cleanName))
         {
             await _ssh.ExecuteCommandAsync("/etc/init.d/mihomo reload 2>/dev/null || /etc/init.d/mihomo restart 2>/dev/null || /etc/init.d/openwrt-mihomo restart 2>/dev/null", 10);
-            return (true, $"Подписка '{providerName}' успешно загружена на роутер и служба обновлена!\n{outStr.Trim()}");
+            return (true, $"Подписка '{cleanName}' успешно загружена на роутер и служба обновлена!\n{outStr.Trim()}");
         }
         return (false, $"Не удалось скачать подписку: {err}");
     }

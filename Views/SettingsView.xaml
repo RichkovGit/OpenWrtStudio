@@ -255,6 +255,10 @@
                             <!-- Auto check switch -->
                             <ui:ToggleSwitch Content="Проверять обновления автоматически при запуске OpenWrt Studio" 
                                              IsChecked="{Binding AutoCheckUpdates}" Margin="0,10,0,0" />
+
+                            <!-- Start minimized to tray switch -->
+                            <ui:ToggleSwitch Content="Запускать приложение свернутым в системный трей (фоновый мониторинг)" 
+                                             IsChecked="{Binding StartMinimizedToTray}" Margin="0,10,0,0" />
                         </StackPanel>
                     </Border>
                 </StackPanel>

@@ -296,33 +296,37 @@ public class DiagnosticsService : IDiagnosticsService
 
     public async Task RunPingAsync(string host, int count, string? iface, int packetSize, string? extraArgs, Action<PingResultItem> onProgress, CancellationToken ct)
     {
+        if (string.IsNullOrWhiteSpace(host) || !ShellHelper.IsSafeHost(host))
+        {
+            onProgress(new PingResultItem
+            {
+                Host = host ?? "",
+                Success = false,
+                RawText = "Ошибка: Недопустимый адрес хоста (обнаружены спецсимволы или пустая строка)."
+            });
+            return;
+        }
+
         var sb = new System.Text.StringBuilder("ping");
 
         if (count > 0)
         {
-            sb.Append($" -c {count}");
+            sb.Append($" -c {Math.Clamp(count, 1, 1000)}");
         }
 
         if (!string.IsNullOrWhiteSpace(iface) && iface != "По умолчанию (Авто)" && iface != "Авто")
         {
-            sb.Append($" -I {iface.Trim()}");
+            var cleanIface = ShellHelper.SanitizeIdentifier(iface.Trim());
+            sb.Append($" -I {ShellHelper.EscapeArg(cleanIface)}");
         }
 
         if (packetSize > 0 && packetSize != 56)
         {
-            sb.Append($" -s {packetSize}");
+            sb.Append($" -s {Math.Clamp(packetSize, 1, 65507)}");
         }
 
-        if (!string.IsNullOrWhiteSpace(extraArgs))
-        {
-            sb.Append($" {extraArgs.Trim()}");
-        }
-        else
-        {
-            sb.Append(" -W 2");
-        }
-
-        sb.Append($" {host.Trim()}");
+        sb.Append(" -W 2");
+        sb.Append($" {ShellHelper.EscapeArg(host.Trim())}");
 
         var cmd = sb.ToString();
         int seq = 1;
@@ -368,7 +372,19 @@ public class DiagnosticsService : IDiagnosticsService
 
     public async Task RunTracerouteAsync(string host, Action<TracerouteHop> onHop, CancellationToken ct)
     {
-        var cmd = $"traceroute -q 1 -w 2 -m 20 {host} 2>&1";
+        if (string.IsNullOrWhiteSpace(host) || !ShellHelper.IsSafeHost(host))
+        {
+            onHop(new TracerouteHop
+            {
+                Hop = 1,
+                Host = "*",
+                Ip = "*",
+                Rtt1 = "Ошибка: Недопустимый адрес хоста."
+            });
+            return;
+        }
+
+        var cmd = $"traceroute -q 1 -w 2 -m 20 {ShellHelper.EscapeArg(host.Trim())} 2>&1";
         await _ssh.RunStreamingCommandAsync(cmd, line =>
         {
             var match = Regex.Match(line, @"^\s*(\d+)\s+([^\s]+)\s+\(([\d\.]+)\)\s+([\d\.]+)\s*ms");

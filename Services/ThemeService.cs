@@ -16,14 +16,17 @@ public interface IThemeService
     IReadOnlyList<ColorThemeItem> AvailableThemes { get; }
     ColorThemeItem CurrentTheme { get; }
     bool IsDarkMode { get; set; }
+    bool StartMinimizedToTray { get; set; }
     void ApplyTheme(string themeId, bool isDarkMode);
     (string themeId, bool isDarkMode) LoadSavedPreferences();
+    void SavePreferences();
 }
 
 public class ThemePreferences
 {
     public string ThemeId { get; set; } = "cyan";
     public bool IsDarkMode { get; set; } = true;
+    public bool StartMinimizedToTray { get; set; } = false;
 }
 
 public class ThemeService : IThemeService
@@ -55,6 +58,8 @@ public class ThemeService : IThemeService
         CurrentTheme = _themes[0];
     }
 
+    public bool StartMinimizedToTray { get; set; } = false;
+
     public (string themeId, bool isDarkMode) LoadSavedPreferences()
     {
         try
@@ -68,6 +73,7 @@ public class ThemeService : IThemeService
                     var found = _themes.FirstOrDefault(t => string.Equals(t.Id, pref.ThemeId, StringComparison.OrdinalIgnoreCase));
                     if (found != null) CurrentTheme = found;
                     IsDarkMode = pref.IsDarkMode;
+                    StartMinimizedToTray = pref.StartMinimizedToTray;
                     return (pref.ThemeId, pref.IsDarkMode);
                 }
             }
@@ -75,6 +81,25 @@ public class ThemeService : IThemeService
         catch { }
 
         return ("cyan", true);
+    }
+
+    public void SavePreferences()
+    {
+        try
+        {
+            var pref = new ThemePreferences
+            {
+                ThemeId = CurrentTheme?.Id ?? "cyan",
+                IsDarkMode = IsDarkMode,
+                StartMinimizedToTray = StartMinimizedToTray
+            };
+            var json = JsonSerializer.Serialize(pref, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(_configPath, json);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ThemeService] Error saving preferences: {ex.Message}");
+        }
     }
 
     public void ApplyTheme(string themeId, bool isDarkMode)
@@ -143,9 +168,7 @@ public class ThemeService : IThemeService
             }
 
             // Save to config
-            var pref = new ThemePreferences { ThemeId = theme.Id, IsDarkMode = isDarkMode };
-            var json = JsonSerializer.Serialize(pref, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(_configPath, json);
+            SavePreferences();
         }
         catch (Exception ex)
         {

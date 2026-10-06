@@ -311,21 +311,22 @@ public class VpnProtocolService : IVpnProtocolService
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
         if (string.IsNullOrWhiteSpace(ifaceName)) return (false, "Имя интерфейса не указано");
 
+        var cleanIface = ShellHelper.SanitizeIdentifier(ifaceName);
         var sb = new StringBuilder();
-        sb.AppendLine($"ifdown {ifaceName} 2>/dev/null");
-        sb.AppendLine($"uci -q delete network.{ifaceName}");
-        sb.AppendLine($"uci -q delete network.{ifaceName}_peer");
-        sb.AppendLine($"for s in $(uci show network | grep -E '=(wireguard|amneziawg)_{Regex.Escape(ifaceName)}' | cut -d'.' -f2 | cut -d'=' -f1); do uci -q delete network.$s; done");
-        sb.AppendLine($"for s in $(uci show network | grep -E '\\.interface=\'{Regex.Escape(ifaceName)}\'' | cut -d'.' -f2); do uci -q delete network.$s; done");
+        sb.AppendLine($"ifdown {cleanIface} 2>/dev/null");
+        sb.AppendLine($"uci -q delete network.{cleanIface}");
+        sb.AppendLine($"uci -q delete network.{cleanIface}_peer");
+        sb.AppendLine($"for s in $(uci show network | grep -E '=(wireguard|amneziawg)_{cleanIface}' | cut -d'.' -f2 | cut -d'=' -f1); do uci -q delete network.$s; done");
+        sb.AppendLine($"for s in $(uci show network | grep -E '\\.interface=\'{cleanIface}\'' | cut -d'.' -f2); do uci -q delete network.$s; done");
         sb.AppendLine("uci commit network");
         sb.AppendLine("/etc/init.d/network reload 2>/dev/null || /etc/init.d/network restart");
 
         var (code, _, err) = await _ssh.ExecuteCommandAsync(sb.ToString(), 15);
         if (code == 0)
         {
-            return (true, $"Интерфейс {ifaceName} и связанные узлы успешно удалены с роутера.");
+            return (true, $"Интерфейс {cleanIface} и связанные узлы успешно удалены с роутера.");
         }
-        return (false, $"Ошибка удаления интерфейса {ifaceName}: {err}");
+        return (false, $"Ошибка удаления интерфейса {cleanIface}: {err}");
     }
 
     public async Task<(bool Success, string Message)> RestartAmneziaWgAsync(string ifaceName)
@@ -333,12 +334,13 @@ public class VpnProtocolService : IVpnProtocolService
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
         if (string.IsNullOrWhiteSpace(ifaceName)) return (false, "Имя интерфейса не указано");
 
-        var (code, _, err) = await _ssh.ExecuteCommandAsync($"ifdown {ifaceName} 2>/dev/null; sleep 1; ifup {ifaceName} 2>/dev/null", 10);
+        var cleanIface = ShellHelper.SanitizeIdentifier(ifaceName);
+        var (code, _, err) = await _ssh.ExecuteCommandAsync($"ifdown {cleanIface} 2>/dev/null; sleep 1; ifup {cleanIface} 2>/dev/null", 10);
         if (code == 0)
         {
-            return (true, $"Интерфейс {ifaceName} перезапущен (ifdown/ifup).");
+            return (true, $"Интерфейс {cleanIface} перезапущен (ifdown/ifup).");
         }
-        return (false, $"Ошибка перезапуска {ifaceName}: {err}");
+        return (false, $"Ошибка перезапуска {cleanIface}: {err}");
     }
 
     public AmneziaWgConfig ParseAmneziaWgConf(string confContent)
@@ -426,7 +428,7 @@ public class VpnProtocolService : IVpnProtocolService
         sb.AppendLine($"for s in $(uci show network | grep -E '\\.interface=\'{Regex.Escape(iface)}\'' | cut -d'.' -f2); do uci -q delete network.$s; done");
         sb.AppendLine($"uci set network.{iface}=interface");
         sb.AppendLine($"uci set network.{iface}.proto='amneziawg'");
-        sb.AppendLine($"uci set network.{iface}.private_key='{config.PrivateKey}'");
+        sb.AppendLine($"uci set network.{iface}.private_key={ShellHelper.EscapeArg(config.PrivateKey)}");
         sb.AppendLine($"uci set network.{iface}.listen_port='{config.ListenPort}'");
         sb.AppendLine($"uci set network.{iface}.mtu='{config.Mtu}'");
 
@@ -434,7 +436,7 @@ public class VpnProtocolService : IVpnProtocolService
         var addrs = config.Address.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
         foreach (var a in addrs)
         {
-            sb.AppendLine($"uci add_list network.{iface}.addresses='{a.Trim()}'");
+            sb.AppendLine($"uci add_list network.{iface}.addresses={ShellHelper.EscapeArg(a.Trim())}");
         }
 
         // AmneziaWG Obfuscation parameters
@@ -451,15 +453,15 @@ public class VpnProtocolService : IVpnProtocolService
         // Peer configuration (wireguard_<iface> + option interface for LuCI compatibility)
         sb.AppendLine($"uci set network.{peerName}=wireguard_{iface}");
         sb.AppendLine($"uci set network.{peerName}.interface='{iface}'");
-        sb.AppendLine($"uci set network.{peerName}.public_key='{config.PeerPublicKey}'");
+        sb.AppendLine($"uci set network.{peerName}.public_key={ShellHelper.EscapeArg(config.PeerPublicKey)}");
         if (!string.IsNullOrWhiteSpace(config.PeerPresharedKey))
         {
-            sb.AppendLine($"uci set network.{peerName}.preshared_key='{config.PeerPresharedKey}'");
+            sb.AppendLine($"uci set network.{peerName}.preshared_key={ShellHelper.EscapeArg(config.PeerPresharedKey)}");
         }
         if (!string.IsNullOrWhiteSpace(endpointHost))
         {
-            sb.AppendLine($"uci set network.{peerName}.endpoint_host='{endpointHost}'");
-            sb.AppendLine($"uci set network.{peerName}.endpoint_port='{endpointPort}'");
+            sb.AppendLine($"uci set network.{peerName}.endpoint_host={ShellHelper.EscapeArg(endpointHost)}");
+            sb.AppendLine($"uci set network.{peerName}.endpoint_port={ShellHelper.EscapeArg(endpointPort)}");
         }
         sb.AppendLine($"uci set network.{peerName}.persistent_keepalive='{config.PersistentKeepalive}'");
         sb.AppendLine($"uci set network.{peerName}.route_allowed_ips='1'");
@@ -467,7 +469,7 @@ public class VpnProtocolService : IVpnProtocolService
         var allowedIps = config.AllowedIPs.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
         foreach (var ip in allowedIps)
         {
-            sb.AppendLine($"uci add_list network.{peerName}.allowed_ips='{ip.Trim()}'");
+            sb.AppendLine($"uci add_list network.{peerName}.allowed_ips={ShellHelper.EscapeArg(ip.Trim())}");
         }
 
         sb.AppendLine("uci commit network");
@@ -577,20 +579,21 @@ public class VpnProtocolService : IVpnProtocolService
     {
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
 
-        var path = $"/etc/openvpn/{config.ProfileName}.ovpn";
+        var cleanName = ShellHelper.SanitizeIdentifier(config.ProfileName, "client");
+        var path = $"/etc/openvpn/{cleanName}.ovpn";
         var (upSuccess, upMsg) = await _ssh.UploadFileContentAsync(config.RawOvpnContent, path);
         if (!upSuccess) return (false, $"Ошибка загрузки профиля OpenVPN: {upMsg}");
 
         var script = $@"
-uci -q delete openvpn.{config.ProfileName}
-uci set openvpn.{config.ProfileName}=openvpn
-uci set openvpn.{config.ProfileName}.enabled='1'
-uci set openvpn.{config.ProfileName}.config='{path}'
+uci -q delete openvpn.{cleanName}
+uci set openvpn.{cleanName}=openvpn
+uci set openvpn.{cleanName}.enabled='1'
+uci set openvpn.{cleanName}.config={ShellHelper.EscapeArg(path)}
 uci commit openvpn
 /etc/init.d/openvpn restart
 ";
         var (code, outStr, err) = await _ssh.ExecuteCommandAsync(script, 15);
-        if (code == 0) return (true, $"Профиль OpenVPN {config.ProfileName} успешно активирован!");
+        if (code == 0) return (true, $"Профиль OpenVPN {cleanName} успешно активирован!");
         return (false, $"Ошибка активации OpenVPN: {err}\n{outStr}");
     }
 
@@ -601,7 +604,7 @@ uci commit openvpn
         var sb = new StringBuilder("tailscale up");
         if (!string.IsNullOrWhiteSpace(config.TailscaleAuthKey))
         {
-            sb.Append($" --authkey='{config.TailscaleAuthKey}'");
+            sb.Append($" --authkey={ShellHelper.EscapeArg(config.TailscaleAuthKey)}");
         }
         if (config.TailscaleAcceptRoutes)
         {
@@ -623,13 +626,16 @@ uci commit openvpn
 
         string cmd = type switch
         {
+            VpnProtocolType.Forkop => "/usr/bin/forkop get_status 2>/dev/null || (/etc/init.d/forkop status 2>/dev/null && echo 'running') || (pidof sing-box 2>/dev/null && echo 'running') || echo 'stopped'",
             VpnProtocolType.AmneziaWg => "awg show 2>/dev/null || wg show 2>/dev/null",
             VpnProtocolType.WireGuard => "wg show 2>/dev/null",
             VpnProtocolType.SingBox => "pidof sing-box 2>/dev/null && echo 'running' || echo 'stopped'",
             VpnProtocolType.Mihomo => "pidof mihomo 2>/dev/null && echo 'running' || echo 'stopped'",
+            VpnProtocolType.PassWall => "pidof passwall 2>/dev/null || (/etc/init.d/passwall status 2>/dev/null && echo 'running') || echo 'stopped'",
             VpnProtocolType.OpenVpn => "pidof openvpn 2>/dev/null && echo 'running' || echo 'stopped'",
             VpnProtocolType.Tailscale => "tailscale status 2>/dev/null",
             VpnProtocolType.ZeroTier => "zerotier-cli status 2>/dev/null",
+            VpnProtocolType.Xray => "pidof xray 2>/dev/null && echo 'running' || echo 'stopped'",
             _ => "echo 'unknown'"
         };
 

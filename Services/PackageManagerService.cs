@@ -222,10 +222,11 @@ public class PackageManagerService : IPackageManagerService
         }
         else if (pm == "apk")
         {
-            if (!string.IsNullOrWhiteSpace(customInstallCmd))
+            var isSafeCustomCmd = !string.IsNullOrWhiteSpace(customInstallCmd) && Regex.IsMatch(customInstallCmd, @"^[a-zA-Z0-9_\-\.\+/:=\s]+$");
+            if (isSafeCustomCmd)
             {
                 // Translate opkg commands to apk equivalents
-                cmd = customInstallCmd
+                cmd = customInstallCmd!
                     .Replace("opkg install --force-depends", "apk add")
                     .Replace("opkg install", "apk add")
                     .Replace("opkg update", "apk update")
@@ -234,14 +235,17 @@ public class PackageManagerService : IPackageManagerService
             }
             else
             {
-                cmd = $"apk add {name}";
+                var cleanName = ShellHelper.SanitizeIdentifier(name);
+                cmd = $"apk add {cleanName}";
             }
         }
         else
         {
-            cmd = !string.IsNullOrWhiteSpace(customInstallCmd)
-                ? customInstallCmd
-                : $"opkg install {name}";
+            var isSafeCustomCmd = !string.IsNullOrWhiteSpace(customInstallCmd) && Regex.IsMatch(customInstallCmd, @"^[a-zA-Z0-9_\-\.\+/:=\s]+$");
+            var cleanName = ShellHelper.SanitizeIdentifier(name);
+            cmd = isSafeCustomCmd
+                ? customInstallCmd!
+                : $"opkg install {cleanName}";
         }
 
         var (code, outStr, err) = await _ssh.ExecuteCommandAsync(cmd, 120);
@@ -270,8 +274,9 @@ public class PackageManagerService : IPackageManagerService
 
     public async Task<(bool Success, string Output)> RemovePackageAsync(string name)
     {
+        var cleanName = ShellHelper.SanitizeIdentifier(name);
         var pm = await DetectPackageManagerAsync();
-        var cmd = pm == "apk" ? $"apk del {name}" : $"opkg remove {name} --autoremove";
+        var cmd = pm == "apk" ? $"apk del {cleanName}" : $"opkg remove {cleanName} --autoremove";
         var (code, outStr, err) = await _ssh.ExecuteCommandAsync(cmd, 40);
         return code == 0
             ? (true, outStr)
@@ -554,12 +559,15 @@ public class PackageManagerService : IPackageManagerService
         string appendCmd;
         if (pm == "apk")
         {
-            appendCmd = $"mkdir -p /etc/apk/repositories.d && echo '{feed.Url.Trim()}' >> /etc/apk/repositories.d/customfeeds.list";
+            var escUrl = ShellHelper.EscapeArg(feed.Url.Trim());
+            appendCmd = $"mkdir -p /etc/apk/repositories.d && echo {escUrl} >> /etc/apk/repositories.d/customfeeds.list";
         }
         else
         {
-            var line = $"src/gz {feed.Name} {feed.Url}\n";
-            appendCmd = $"mkdir -p /etc/opkg && echo '{line.Trim()}' >> /etc/opkg/customfeeds.conf";
+            var cleanName = ShellHelper.SanitizeIdentifier(feed.Name, "custom_feed");
+            var line = $"src/gz {cleanName} {feed.Url.Trim()}";
+            var escLine = ShellHelper.EscapeArg(line);
+            appendCmd = $"mkdir -p /etc/opkg && echo {escLine} >> /etc/opkg/customfeeds.conf";
         }
 
         var (code, _, err) = await _ssh.ExecuteCommandAsync(appendCmd, 10);
@@ -570,15 +578,16 @@ public class PackageManagerService : IPackageManagerService
 
     public async Task<(bool Success, string Message)> RemoveCustomFeedAsync(string feedName)
     {
+        var cleanFeedName = ShellHelper.SanitizeIdentifier(feedName);
         var pm = await DetectPackageManagerAsync();
         string sedCmd;
         if (pm == "apk")
         {
-            sedCmd = $"sed -i '/{feedName}/d' /etc/apk/repositories.d/customfeeds.list 2>/dev/null || sed -i '/{feedName}/d' /etc/apk/repositories 2>/dev/null";
+            sedCmd = $"sed -i '/{cleanFeedName}/d' /etc/apk/repositories.d/customfeeds.list 2>/dev/null || sed -i '/{cleanFeedName}/d' /etc/apk/repositories 2>/dev/null";
         }
         else
         {
-            sedCmd = $"sed -i '/{feedName}/d' /etc/opkg/customfeeds.conf";
+            sedCmd = $"sed -i '/{cleanFeedName}/d' /etc/opkg/customfeeds.conf";
         }
 
         var (code, _, err) = await _ssh.ExecuteCommandAsync(sedCmd, 10);

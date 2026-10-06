@@ -42,7 +42,7 @@ if command -v apk >/dev/null 2>&1; then
     apk list -I 2>/dev/null || apk info -v 2>/dev/null
 fi
 echo '===BINARIES==='
-for b in awg amneziawg-go wg sing-box mihomo clash passwall openvpn tailscale tailscaled zerotier zerotier-one xray xray-core; do
+for b in forkop awg amneziawg-go wg sing-box mihomo clash passwall openvpn tailscale tailscaled zerotier zerotier-one xray xray-core; do
     p=$(command -v ""$b"" 2>/dev/null || which ""$b"" 2>/dev/null)
     [ -n ""$p"" ] && echo ""$b:$p""
     [ -f ""/usr/bin/$b"" ] && echo ""$b:/usr/bin/$b""
@@ -89,6 +89,24 @@ ip link show 2>/dev/null || ifconfig 2>/dev/null
 
         report.Protocols = new List<VpnProtocolCapability>
         {
+            CreateCapability(
+                VpnProtocolType.Forkop,
+                "ForkOP (Sing-box)",
+                "Прозрачный прокси-клиент с интеграцией ядра Sing-box и Clash API",
+                "luci-app-forkop",
+                "/etc/config/forkop",
+                "ShieldGlobe24",
+                "opkg update && opkg install forkop luci-app-forkop || apk add forkop luci-app-forkop",
+                hasObf: true,
+                pkgsSec, binSec, initSec, modSec, cfgSec, runningSec, ifaceSec,
+                pkgCandidates: new[] { "luci-app-forkop", "forkop", "sing-box" },
+                binCandidates: new[] { "forkop", "sing-box" },
+                modCandidates: Array.Empty<string>(),
+                svcCandidates: new[] { "forkop", "sing-box" },
+                cfgCandidates: new[] { "forkop", "sing-box" },
+                runningCandidates: new[] { "forkop", "sing-box" },
+                ifaceCandidates: new[] { "forkop", "sing-box", "tun" }),
+
             CreateCapability(
                 VpnProtocolType.AmneziaWg,
                 "AmneziaWG (AWG)",

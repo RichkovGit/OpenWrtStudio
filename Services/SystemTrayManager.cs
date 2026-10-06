@@ -10,6 +10,7 @@ public interface ISystemTrayManager
 {
     void Initialize(Window mainWindow);
     void UpdateStatusText(string status);
+    void ShowBalloonTip(string title, string message, Hardcodet.Wpf.TaskbarNotification.BalloonIcon icon = Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info);
     void Dispose();
 }
 
@@ -110,6 +111,7 @@ public class SystemTrayManager : ISystemTrayManager, IDisposable
 
         _taskbarIcon.ContextMenu = contextMenu;
         _taskbarIcon.TrayMouseDoubleClick += (s, e) => RestoreMainWindow();
+        _taskbarIcon.TrayLeftMouseDown += (s, e) => RestoreMainWindow();
 
         // Listen for notification dispatches
         _notifications.OnNotificationRequested += (title, message, severity) =>
@@ -143,6 +145,14 @@ public class SystemTrayManager : ISystemTrayManager, IDisposable
         });
     }
 
+    public void ShowBalloonTip(string title, string message, BalloonIcon icon = BalloonIcon.Info)
+    {
+        Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _taskbarIcon?.ShowBalloonTip(title, message, icon);
+        });
+    }
+
     private void RestoreMainWindow()
     {
         if (_mainWindow == null) return;
@@ -153,6 +163,8 @@ public class SystemTrayManager : ISystemTrayManager, IDisposable
         }
         _mainWindow.Activate();
         _mainWindow.Focus();
+        _mainWindow.Topmost = true;
+        _mainWindow.Topmost = false;
     }
 
     private void OnMainWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)

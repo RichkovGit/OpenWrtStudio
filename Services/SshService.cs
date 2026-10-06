@@ -236,11 +236,11 @@ public class SshService : ISshService, IDisposable
                 // Fallback: Robust base64 upload via SSH (compatible with 100% of OpenWrt/BusyBox routers)
                 if (!string.IsNullOrEmpty(dir))
                 {
-                    _sshClient.RunCommand($"mkdir -p '{dir}'");
+                    _sshClient.RunCommand($"mkdir -p {ShellHelper.EscapeArg(dir)}");
                 }
 
                 var b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(content));
-                var uploadCmd = $"echo '{b64}' | base64 -d > '{remotePath}'";
+                var uploadCmd = $"echo '{b64}' | base64 -d > {ShellHelper.EscapeArg(remotePath)}";
                 var res = _sshClient.RunCommand(uploadCmd);
                 if (res.ExitStatus == 0)
                 {
@@ -276,7 +276,8 @@ public class SshService : ISshService, IDisposable
                 }
 
                 // Fallback: Read via SSH base64
-                var res = _sshClient.RunCommand($"[ -f '{remotePath}' ] && base64 '{remotePath}' || echo '__FILE_NOT_FOUND__'");
+                var escRemote = ShellHelper.EscapeArg(remotePath);
+                var res = _sshClient.RunCommand($"[ -f {escRemote} ] && base64 {escRemote} || echo '__FILE_NOT_FOUND__'");
                 var outText = res.Result.Trim();
                 if (outText.Contains("__FILE_NOT_FOUND__"))
                 {
@@ -311,7 +312,8 @@ public class SshService : ISshService, IDisposable
                 }
 
                 // Fallback: Read via SSH base64
-                var res = _sshClient.RunCommand($"[ -f '{remotePath}' ] && base64 '{remotePath}' || echo '__FILE_NOT_FOUND__'");
+                var escRemote = ShellHelper.EscapeArg(remotePath);
+                var res = _sshClient.RunCommand($"[ -f {escRemote} ] && base64 {escRemote} || echo '__FILE_NOT_FOUND__'");
                 var outText = res.Result.Trim();
                 if (outText.Contains("__FILE_NOT_FOUND__"))
                 {
@@ -347,11 +349,12 @@ public class SshService : ISshService, IDisposable
                 }
 
                 // Fallback: Write via base64
+                var escRemote = ShellHelper.EscapeArg(remotePath);
                 var b64 = Convert.ToBase64String(data);
                 if (b64.Length > 60000)
                 {
                     var tmpB64 = "/tmp/_upload.b64";
-                    _sshClient.RunCommand($"rm -f '{tmpB64}' '{remotePath}'");
+                    _sshClient.RunCommand($"rm -f '{tmpB64}' {escRemote}");
                     int chunkSize = 30000;
                     for (int i = 0; i < b64.Length; i += chunkSize)
                     {
@@ -363,7 +366,7 @@ public class SshService : ISshService, IDisposable
                             return (false, $"Ошибка передачи фрагмента: {appendRes.Error}");
                         }
                     }
-                    var decodeRes = _sshClient.RunCommand($"base64 -d '{tmpB64}' > '{remotePath}' && rm -f '{tmpB64}'");
+                    var decodeRes = _sshClient.RunCommand($"base64 -d '{tmpB64}' > {escRemote} && rm -f '{tmpB64}'");
                     if (decodeRes.ExitStatus == 0)
                     {
                         return (true, $"Файл успешно загружен в {remotePath}");
@@ -372,7 +375,7 @@ public class SshService : ISshService, IDisposable
                 }
                 else
                 {
-                    var uploadCmd = $"echo '{b64}' | base64 -d > '{remotePath}'";
+                    var uploadCmd = $"echo '{b64}' | base64 -d > {escRemote}";
                     var res = _sshClient.RunCommand(uploadCmd);
                     if (res.ExitStatus == 0)
                     {

@@ -258,7 +258,7 @@ public class UsbConfigService : IUsbConfigService
         // 3. Query signal if uqmi or umbim available
         if (profile.Protocol == "qmi")
         {
-            var (sigExit, sigOut, _) = await _ssh.ExecuteCommandAsync($"uqmi -d {profile.DeviceNode} --get-signal-info 2>/dev/null", 5);
+            var (sigExit, sigOut, _) = await _ssh.ExecuteCommandAsync($"uqmi -d {ShellHelper.EscapeArg(profile.DeviceNode)} --get-signal-info 2>/dev/null", 5);
             if (sigExit == 0 && !string.IsNullOrWhiteSpace(sigOut))
             {
                 var rssiMatch = Regex.Match(sigOut, @"""rssi"":\s*(-?\d+)");
@@ -276,19 +276,20 @@ public class UsbConfigService : IUsbConfigService
     {
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
 
-        var cmd = $"uci set network.{profile.InterfaceName}=interface && " +
-                  $"uci set network.{profile.InterfaceName}.proto='{profile.Protocol}' && " +
-                  $"uci set network.{profile.InterfaceName}.device='{profile.DeviceNode}' && " +
-                  $"uci set network.{profile.InterfaceName}.apn='{profile.Apn}' && " +
-                  $"uci set network.{profile.InterfaceName}.pdptype='{profile.PdpType}' && " +
-                  $"uci set network.{profile.InterfaceName}.auth='{profile.AuthType}' && ";
+        var iface = ShellHelper.SanitizeIdentifier(profile.InterfaceName, "wwan");
+        var cmd = $"uci set network.{iface}=interface && " +
+                  $"uci set network.{iface}.proto={ShellHelper.EscapeArg(profile.Protocol)} && " +
+                  $"uci set network.{iface}.device={ShellHelper.EscapeArg(profile.DeviceNode)} && " +
+                  $"uci set network.{iface}.apn={ShellHelper.EscapeArg(profile.Apn)} && " +
+                  $"uci set network.{iface}.pdptype={ShellHelper.EscapeArg(profile.PdpType)} && " +
+                  $"uci set network.{iface}.auth={ShellHelper.EscapeArg(profile.AuthType)} && ";
 
         if (!string.IsNullOrEmpty(profile.PinCode))
-            cmd += $"uci set network.{profile.InterfaceName}.pincode='{profile.PinCode}' && ";
+            cmd += $"uci set network.{iface}.pincode={ShellHelper.EscapeArg(profile.PinCode)} && ";
         if (!string.IsNullOrEmpty(profile.Username))
-            cmd += $"uci set network.{profile.InterfaceName}.username='{profile.Username}' && ";
+            cmd += $"uci set network.{iface}.username={ShellHelper.EscapeArg(profile.Username)} && ";
         if (!string.IsNullOrEmpty(profile.Password))
-            cmd += $"uci set network.{profile.InterfaceName}.password='{profile.Password}' && ";
+            cmd += $"uci set network.{iface}.password={ShellHelper.EscapeArg(profile.Password)} && ";
 
         cmd += "uci commit network";
 
@@ -305,7 +306,8 @@ public class UsbConfigService : IUsbConfigService
     {
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
 
-        var cmd = $"ifdown {interfaceName} 2>/dev/null; sleep 1; ifup {interfaceName} 2>/dev/null || /etc/init.d/network reload";
+        var cleanIface = ShellHelper.SanitizeIdentifier(interfaceName, "wwan");
+        var cmd = $"ifdown {cleanIface} 2>/dev/null; sleep 1; ifup {cleanIface} 2>/dev/null || /etc/init.d/network reload";
         var (exitCode, outMsg, errMsg) = await _ssh.ExecuteCommandAsync(cmd, 15);
         if (exitCode == 0)
         {
@@ -319,38 +321,40 @@ public class UsbConfigService : IUsbConfigService
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
 
         var fs = fileSystem?.ToLowerInvariant() ?? "";
+        var escDev = ShellHelper.EscapeArg(deviceNode);
+        var escTarget = ShellHelper.EscapeArg(target);
         string mountCmd;
 
         if (fs.Contains("exfat"))
         {
-            mountCmd = $"mount -t exfat -o rw,noatime,iocharset=utf8,umask=000,dmask=0000,fmask=0000 '{deviceNode}' '{target}' 2>/dev/null || " +
-                       $"mount -o rw,noatime,iocharset=utf8,umask=000 '{deviceNode}' '{target}' 2>/dev/null || " +
-                       $"mount '{deviceNode}' '{target}'";
+            mountCmd = $"mount -t exfat -o rw,noatime,iocharset=utf8,umask=000,dmask=0000,fmask=0000 {escDev} {escTarget} 2>/dev/null || " +
+                       $"mount -o rw,noatime,iocharset=utf8,umask=000 {escDev} {escTarget} 2>/dev/null || " +
+                       $"mount {escDev} {escTarget}";
         }
         else if (fs.Contains("vfat") || fs.Contains("fat"))
         {
             // Windows FAT32 with Russian/Cyrillic support (CP866 + UTF-8) and full read/write permissions
-            mountCmd = $"mount -t vfat -o rw,noatime,iocharset=utf8,utf8=1,codepage=866,umask=000,dmask=0000,fmask=0000 '{deviceNode}' '{target}' 2>/dev/null || " +
-                       $"mount -o rw,noatime,iocharset=utf8,utf8=1,umask=000 '{deviceNode}' '{target}' 2>/dev/null || " +
-                       $"mount '{deviceNode}' '{target}'";
+            mountCmd = $"mount -t vfat -o rw,noatime,iocharset=utf8,utf8=1,codepage=866,umask=000,dmask=0000,fmask=0000 {escDev} {escTarget} 2>/dev/null || " +
+                       $"mount -o rw,noatime,iocharset=utf8,utf8=1,umask=000 {escDev} {escTarget} 2>/dev/null || " +
+                       $"mount {escDev} {escTarget}";
         }
         else if (fs.Contains("ntfs"))
         {
             // Windows NTFS with full UTF-8 and write permissions via ntfs-3g or kernel ntfs3 driver
-            mountCmd = $"ntfs-3g -o rw,noatime,big_writes,iocharset=utf8,umask=000 '{deviceNode}' '{target}' 2>/dev/null || " +
-                       $"mount -t ntfs3 -o rw,noatime,iocharset=utf8,umask=000,dmask=0000,fmask=0000 '{deviceNode}' '{target}' 2>/dev/null || " +
-                       $"mount -o rw,noatime,iocharset=utf8,umask=000 '{deviceNode}' '{target}' 2>/dev/null || " +
-                       $"mount '{deviceNode}' '{target}'";
+            mountCmd = $"ntfs-3g -o rw,noatime,big_writes,iocharset=utf8,umask=000 {escDev} {escTarget} 2>/dev/null || " +
+                       $"mount -t ntfs3 -o rw,noatime,iocharset=utf8,umask=000,dmask=0000,fmask=0000 {escDev} {escTarget} 2>/dev/null || " +
+                       $"mount -o rw,noatime,iocharset=utf8,umask=000 {escDev} {escTarget} 2>/dev/null || " +
+                       $"mount {escDev} {escTarget}";
         }
         else
         {
             // Generic mount with UTF-8 priority and full write access
-            mountCmd = $"mount -o rw,noatime,iocharset=utf8,utf8=1,umask=000 '{deviceNode}' '{target}' 2>/dev/null || " +
-                       $"mount -o rw,noatime,umask=000 '{deviceNode}' '{target}' 2>/dev/null || " +
-                       $"mount '{deviceNode}' '{target}'";
+            mountCmd = $"mount -o rw,noatime,iocharset=utf8,utf8=1,umask=000 {escDev} {escTarget} 2>/dev/null || " +
+                       $"mount -o rw,noatime,umask=000 {escDev} {escTarget} 2>/dev/null || " +
+                       $"mount {escDev} {escTarget}";
         }
 
-        var fullCmd = $"mkdir -p '{target}' && ({mountCmd}) && (chmod 777 '{target}' 2>/dev/null || true)";
+        var fullCmd = $"mkdir -p {escTarget} && ({mountCmd}) && (chmod 777 {escTarget} 2>/dev/null || true)";
         var (exitCode, _, errMsg) = await _ssh.ExecuteCommandAsync(fullCmd, 15);
         if (exitCode == 0)
         {
@@ -373,7 +377,8 @@ public class UsbConfigService : IUsbConfigService
     {
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
 
-        var (exitCode, _, errMsg) = await _ssh.ExecuteCommandAsync($"umount '{mountPointOrDevice}'", 10);
+        var escTarget = ShellHelper.EscapeArg(mountPointOrDevice);
+        var (exitCode, _, errMsg) = await _ssh.ExecuteCommandAsync($"umount {escTarget}", 10);
         if (exitCode == 0)
         {
             return (true, $"Диск {mountPointOrDevice} успешно размонтирован");
@@ -392,20 +397,23 @@ public class UsbConfigService : IUsbConfigService
             return (false, "Пакет Samba4 не установлен. Установите пакеты общего доступа через кнопку «Установить пакеты хранилища и Samba».");
         }
 
+        var escPath = ShellHelper.EscapeArg(path);
+        var escShareName = ShellHelper.EscapeArg(shareName);
+
         // Grant full permissions on directory
-        var prepareCmd = $"mkdir -p '{path}' && chmod 777 '{path}' 2>/dev/null || true";
+        var prepareCmd = $"mkdir -p {escPath} && chmod 777 {escPath} 2>/dev/null || true";
         await _ssh.ExecuteCommandAsync(prepareCmd, 5);
 
         // Check if existing share for this path already exists to avoid duplicates, and enforce force_user=root
         var uciScript =
-            "EXISTING=$(uci show samba4 2>/dev/null | grep -E \"\\.path='?\"'" + path + "\"'?\" | cut -d. -f2 | head -n1); " +
+            "EXISTING=$(uci show samba4 2>/dev/null | grep -F \".path=\" | grep -F " + escPath + " | cut -d. -f2 | head -n1); " +
             "if [ -z \"$EXISTING\" ]; then " +
             "  SECTION=$(uci add samba4 sambashare); " +
             "else " +
             "  SECTION=\"samba4.$EXISTING\"; " +
             "fi; " +
-            $"uci set ${{SECTION}}.name='{shareName}'; " +
-            $"uci set ${{SECTION}}.path='{path}'; " +
+            $"uci set ${{SECTION}}.name={escShareName}; " +
+            $"uci set ${{SECTION}}.path={escPath}; " +
             "uci set ${SECTION}.read_only='no'; " +
             "uci set ${SECTION}.guest_ok='yes'; " +
             "uci set ${SECTION}.force_root='1'; " +
