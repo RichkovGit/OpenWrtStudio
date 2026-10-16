@@ -31,6 +31,7 @@ public class SshService : ISshService, IDisposable
     private SshClient? _sshClient;
     private SftpClient? _sftpClient;
     private readonly SemaphoreSlim _lock = new(1, 1);
+    private bool _disposed;
 
     public bool IsConnected => _sshClient?.IsConnected == true;
     public ConnectionProfile? CurrentProfile { get; private set; }
@@ -38,9 +39,11 @@ public class SshService : ISshService, IDisposable
 
     public async Task<(bool Success, string Message)> ConnectAsync(ConnectionProfile profile)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         await _lock.WaitAsync();
         try
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             await DisconnectInternalAsync();
             var connectionInfo = CreateConnectionInfo(profile);
             _sshClient = new SshClient(connectionInfo);
@@ -48,19 +51,18 @@ public class SshService : ISshService, IDisposable
             await Task.Run(() =>
             {
                 _sshClient.Connect();
+                // SFTP is optional. Keep its connection timeout off the UI thread too.
+                try
+                {
+                    _sftpClient = new SftpClient(connectionInfo);
+                    _sftpClient.Connect();
+                }
+                catch
+                {
+                    _sftpClient?.Dispose();
+                    _sftpClient = null;
+                }
             });
-
-            // SFTP is optional (most OpenWrt routers only have Dropbear SSH without SFTP subsystem)
-            try
-            {
-                _sftpClient = new SftpClient(connectionInfo);
-                _sftpClient.Connect();
-            }
-            catch
-            {
-                _sftpClient?.Dispose();
-                _sftpClient = null;
-            }
 
             CurrentProfile = profile;
             ConnectionChanged?.Invoke(this, true);
@@ -94,26 +96,30 @@ public class SshService : ISshService, IDisposable
 
     private Task DisconnectInternalAsync()
     {
+        var sftpClient = _sftpClient;
+        var sshClient = _sshClient;
+        _sftpClient = null;
+        _sshClient = null;
+        CurrentProfile = null;
         try
         {
-            if (_sftpClient?.IsConnected == true) _sftpClient.Disconnect();
-            _sftpClient?.Dispose();
-            _sftpClient = null;
-
-            if (_sshClient?.IsConnected == true) _sshClient.Disconnect();
-            _sshClient?.Dispose();
-            _sshClient = null;
+            sftpClient?.Dispose();
         }
-        catch
+        catch { }
+        try
         {
-            // Ignore on cleanup
+            sshClient?.Dispose();
         }
-        CurrentProfile = null;
+        catch { }
         return Task.CompletedTask;
     }
 
     public async Task<(int ExitCode, string Output, string Error)> ExecuteCommandAsync(string command, int timeoutSeconds = 30)
     {
+        if (timeoutSeconds <= 0) throw new ArgumentOutOfRangeException(nameof(timeoutSeconds));
+        await _lock.WaitAsync();
+        try
+        {
         if (!IsConnected || _sshClient == null)
         {
             return (-1, string.Empty, "Нет подключения к роутеру");
@@ -129,17 +135,19 @@ public class SshService : ISshService, IDisposable
             {
                 using var cmd = _sshClient.CreateCommand(unixCmd);
                 cmd.CommandTimeout = TimeSpan.FromSeconds(timeoutSeconds);
-                var asyncResult = cmd.BeginExecute();
-                asyncResult.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(timeoutSeconds));
-                cmd.EndExecute(asyncResult);
-
-                return (cmd.ExitStatus ?? 0, cmd.Result, cmd.Error);
+                cmd.Execute();
+                return (cmd.ExitStatus ?? -1, cmd.Result, cmd.Error);
             }
             catch (Exception ex)
             {
                 return (-1, string.Empty, ex.Message);
             }
         });
+        }
+        finally
+        {
+            _lock.Release();
+        }
     }
 
     public async Task RunStreamingCommandAsync(string command, Action<string> onLineReceived, CancellationToken cancellationToken)
@@ -207,94 +215,20 @@ public class SshService : ISshService, IDisposable
         }, cancellationToken);
     }
 
-    public async Task<(bool Success, string Message)> UploadFileContentAsync(string content, string remotePath)
-    {
-        if (!IsConnected || _sshClient == null)
-        {
-            return (false, "Роутер не подключен");
-        }
-
-        return await Task.Run(() =>
-        {
-            try
-            {
-                var dir = Path.GetDirectoryName(remotePath)?.Replace("\\", "/");
-
-                // Try SFTP first if available
-                if (_sftpClient?.IsConnected == true)
-                {
-                    if (!string.IsNullOrEmpty(dir) && !_sftpClient.Exists(dir))
-                    {
-                        CreateRemoteDirectoriesRecursively(_sftpClient, dir);
-                    }
-
-                    using var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
-                    _sftpClient.UploadFile(ms, remotePath, true);
-                    return (true, $"Файл успешно загружен в {remotePath}");
-                }
-
-                // Fallback: Robust base64 upload via SSH (compatible with 100% of OpenWrt/BusyBox routers)
-                if (!string.IsNullOrEmpty(dir))
-                {
-                    _sshClient.RunCommand($"mkdir -p {ShellHelper.EscapeArg(dir)}");
-                }
-
-                var b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(content));
-                var uploadCmd = $"echo '{b64}' | base64 -d > {ShellHelper.EscapeArg(remotePath)}";
-                var res = _sshClient.RunCommand(uploadCmd);
-                if (res.ExitStatus == 0)
-                {
-                    return (true, $"Файл успешно загружен в {remotePath}");
-                }
-
-                return (false, $"Ошибка передачи файла: {res.Error}");
-            }
-            catch (Exception ex)
-            {
-                return (false, $"Ошибка передачи файла: {ex.Message}");
-            }
-        });
-    }
+    public Task<(bool Success, string Message)> UploadFileContentAsync(string content, string remotePath) =>
+        UploadBinaryFileAsync(Encoding.UTF8.GetBytes(content), remotePath);
 
     public async Task<(bool Success, string Content)> DownloadFileContentAsync(string remotePath)
     {
-        if (!IsConnected || _sshClient == null)
-        {
-            return (false, "Роутер не подключен");
-        }
-
-        return await Task.Run(() =>
-        {
-            try
-            {
-                if (_sftpClient?.IsConnected == true && _sftpClient.Exists(remotePath))
-                {
-                    using var ms = new MemoryStream();
-                    _sftpClient.DownloadFile(remotePath, ms);
-                    var content = Encoding.UTF8.GetString(ms.ToArray());
-                    return (true, content);
-                }
-
-                // Fallback: Read via SSH base64
-                var escRemote = ShellHelper.EscapeArg(remotePath);
-                var res = _sshClient.RunCommand($"[ -f {escRemote} ] && base64 {escRemote} || echo '__FILE_NOT_FOUND__'");
-                var outText = res.Result.Trim();
-                if (outText.Contains("__FILE_NOT_FOUND__"))
-                {
-                    return (false, "Указанный файл не найден на роутере");
-                }
-                var bytes = Convert.FromBase64String(outText.Replace("\n", "").Replace("\r", ""));
-                return (true, Encoding.UTF8.GetString(bytes));
-            }
-            catch (Exception ex)
-            {
-                return (false, $"Ошибка чтения: {ex.Message}");
-            }
-        });
+        var result = await DownloadBinaryFileAsync(remotePath);
+        return result.Success ? (true, Encoding.UTF8.GetString(result.Data!)) : (false, result.Error);
     }
 
     public async Task<(bool Success, byte[]? Data, string Error)> DownloadBinaryFileAsync(string remotePath)
     {
+        await _lock.WaitAsync();
+        try
+        {
         if (!IsConnected || _sshClient == null)
         {
             return (false, null, "Роутер не подключен");
@@ -313,11 +247,11 @@ public class SshService : ISshService, IDisposable
 
                 // Fallback: Read via SSH base64
                 var escRemote = ShellHelper.EscapeArg(remotePath);
-                var res = _sshClient.RunCommand($"[ -f {escRemote} ] && base64 {escRemote} || echo '__FILE_NOT_FOUND__'");
+                using var res = _sshClient.RunCommand($"[ -f {escRemote} ] && base64 < {escRemote}");
                 var outText = res.Result.Trim();
-                if (outText.Contains("__FILE_NOT_FOUND__"))
+                if (res.ExitStatus != 0)
                 {
-                    return (false, null, "Указанный файл не найден на роутере");
+                    return (false, null, $"Не удалось прочитать файл: {res.Error}");
                 }
                 var cleanB64 = outText.Replace("\n", "").Replace("\r", "").Trim();
                 var bytes = Convert.FromBase64String(cleanB64);
@@ -328,10 +262,21 @@ public class SshService : ISshService, IDisposable
                 return (false, null, $"Ошибка чтения двоичного файла: {ex.Message}");
             }
         });
+        }
+        finally
+        {
+            _lock.Release();
+        }
     }
 
     public async Task<(bool Success, string Message)> UploadBinaryFileAsync(byte[] data, string remotePath)
     {
+        ArgumentNullException.ThrowIfNull(data);
+        if (string.IsNullOrWhiteSpace(remotePath) || remotePath.Contains('\0'))
+            return (false, "Укажите путь к файлу на роутере");
+        await _lock.WaitAsync();
+        try
+        {
         if (!IsConnected || _sshClient == null)
         {
             return (false, "Роутер не подключен");
@@ -341,47 +286,84 @@ public class SshService : ISshService, IDisposable
         {
             try
             {
+                if (!remotePath.StartsWith('/')) remotePath = "./" + remotePath;
+                // Rename the target of an existing symlink, preserving links such as
+                // /etc/resolv.conf rather than replacing the link with a regular file.
+                using (var resolve = _sshClient.RunCommand($"if [ -L {ShellHelper.EscapeArg(remotePath)} ]; then readlink -f {ShellHelper.EscapeArg(remotePath)}; fi"))
+                {
+                    if (resolve.ExitStatus != 0) throw new IOException($"Не удалось разрешить путь файла: {resolve.Error}");
+                    if (!string.IsNullOrWhiteSpace(resolve.Result)) remotePath = resolve.Result.TrimEnd('\r', '\n');
+                }
+                // Remote paths are POSIX paths regardless of the host OS.
+                var slash = remotePath.LastIndexOf('/');
+                var dir = slash >= 0 ? remotePath[..(slash + 1)] : "./";
+                var escRemote = ShellHelper.EscapeArg(remotePath);
+                var temporary = dir + $".openwrtstudio-{Guid.NewGuid():N}";
+                var tempFile = ShellHelper.EscapeArg(temporary + ".part");
+                void RunChecked(string command)
+                {
+                    using var commandResult = _sshClient.CreateCommand(command);
+                    commandResult.CommandTimeout = TimeSpan.FromSeconds(30);
+                    commandResult.Execute();
+                    if (commandResult.ExitStatus != 0)
+                        throw new IOException($"{commandResult.Error} (код {commandResult.ExitStatus})");
+                }
                 if (_sftpClient?.IsConnected == true)
                 {
-                    using var ms = new MemoryStream(data);
-                    _sftpClient.UploadFile(ms, remotePath, true);
-                    return (true, $"Файл успешно загружен в {remotePath}");
+                    if (!_sftpClient.Exists(dir)) CreateRemoteDirectoriesRecursively(_sftpClient, dir);
+                    var uploadPath = temporary + ".upload";
+                    var tempUpload = ShellHelper.EscapeArg(uploadPath);
+                    try
+                    {
+                        // Create the transfer file privately before SFTP opens it.
+                        // Interrupted uploads must never truncate the destination.
+                        RunChecked($"(umask 077; : > {tempUpload})");
+                        using (var ms = new MemoryStream(data))
+                            _sftpClient.UploadFile(ms, uploadPath, true);
+                        if (_sftpClient.GetAttributes(uploadPath).Size != data.LongLength)
+                            throw new IOException("Файл передан не полностью.");
+
+                        // cp -p retains an existing file's ownership and executable
+                        // bits; replacement is a rename on the same filesystem.
+                        RunChecked($"(umask 077; if [ -e {escRemote} ]; then cp -p {escRemote} {tempFile} || exit; fi; cat {tempUpload} > {tempFile}) && mv -f {tempFile} {escRemote}");
+                        return (true, $"Файл успешно загружен в {remotePath}");
+                    }
+                    finally
+                    {
+                        try { RunChecked($"rm -f {tempUpload} {tempFile}"); }
+                        catch
+                        {
+                            // SSH may have failed while SFTP is still usable.
+                            foreach (var path in new[] { uploadPath, temporary + ".part" })
+                            {
+                                try { if (_sftpClient.Exists(path)) _sftpClient.DeleteFile(path); }
+                                catch { /* A lost connection may prevent cleanup. */ }
+                            }
+                        }
+                    }
                 }
 
-                // Fallback: Write via base64
-                var escRemote = ShellHelper.EscapeArg(remotePath);
+                // Stage beside the destination, then rename only after all chunks decode.
+                // This preserves the existing file on failure and isolates concurrent app instances.
                 var b64 = Convert.ToBase64String(data);
-                if (b64.Length > 60000)
+                var tempB64 = ShellHelper.EscapeArg(temporary + ".b64");
+                try
                 {
-                    var tmpB64 = "/tmp/_upload.b64";
-                    _sshClient.RunCommand($"rm -f '{tmpB64}' {escRemote}");
-                    int chunkSize = 30000;
+                    RunChecked($"mkdir -p {ShellHelper.EscapeArg(dir)} && (umask 077; : > {tempB64})");
+                    const int chunkSize = 30000;
                     for (int i = 0; i < b64.Length; i += chunkSize)
                     {
                         var chunk = b64.Substring(i, Math.Min(chunkSize, b64.Length - i));
-                        var appendCmd = $"printf '%s' '{chunk}' >> '{tmpB64}'";
-                        var appendRes = _sshClient.RunCommand(appendCmd);
-                        if (appendRes.ExitStatus != 0)
-                        {
-                            return (false, $"Ошибка передачи фрагмента: {appendRes.Error}");
-                        }
+                        RunChecked($"printf '%s' '{chunk}' >> {tempB64}");
                     }
-                    var decodeRes = _sshClient.RunCommand($"base64 -d '{tmpB64}' > {escRemote} && rm -f '{tmpB64}'");
-                    if (decodeRes.ExitStatus == 0)
-                    {
-                        return (true, $"Файл успешно загружен в {remotePath}");
-                    }
-                    return (false, $"Ошибка декодирования файла: {decodeRes.Error}");
+                    // Preserve executable bits/ownership for existing scripts and configs.
+                    RunChecked($"(umask 077; if [ -e {escRemote} ]; then cp -p {escRemote} {tempFile} || exit; fi; base64 -d < {tempB64} > {tempFile}) && mv -f {tempFile} {escRemote}");
+                    return (true, $"Файл успешно загружен в {remotePath}");
                 }
-                else
+                finally
                 {
-                    var uploadCmd = $"echo '{b64}' | base64 -d > {escRemote}";
-                    var res = _sshClient.RunCommand(uploadCmd);
-                    if (res.ExitStatus == 0)
-                    {
-                        return (true, $"Файл успешно загружен в {remotePath}");
-                    }
-                    return (false, $"Ошибка передачи файла: {res.Error}");
+                    try { RunChecked($"rm -f {tempB64} {tempFile}"); }
+                    catch { /* Cleanup must not hide the transfer result. */ }
                 }
             }
             catch (Exception ex)
@@ -389,6 +371,11 @@ public class SshService : ISshService, IDisposable
                 return (false, $"Ошибка передачи файла: {ex.Message}");
             }
         });
+        }
+        finally
+        {
+            _lock.Release();
+        }
     }
 
     public async Task<(bool Success, string Message)> TestConnectionAsync(ConnectionProfile profile)
@@ -420,8 +407,10 @@ public class SshService : ISshService, IDisposable
     {
         var authMethods = new System.Collections.Generic.List<AuthenticationMethod>();
 
-        if (profile.UseKeyAuth && !string.IsNullOrWhiteSpace(profile.PrivateKeyPath) && File.Exists(profile.PrivateKeyPath))
+        if (profile.UseKeyAuth)
         {
+            if (string.IsNullOrWhiteSpace(profile.PrivateKeyPath) || !File.Exists(profile.PrivateKeyPath))
+                throw new FileNotFoundException("Файл закрытого SSH ключа не найден. Проверьте путь в профиле.");
             var keyFile = string.IsNullOrEmpty(profile.PrivateKeyPassphrase)
                 ? new PrivateKeyFile(profile.PrivateKeyPath)
                 : new PrivateKeyFile(profile.PrivateKeyPath, profile.PrivateKeyPassphrase);
@@ -458,7 +447,7 @@ public class SshService : ISshService, IDisposable
     private static void CreateRemoteDirectoriesRecursively(SftpClient client, string path)
     {
         var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        var current = "";
+        var current = path.StartsWith('/') ? "" : ".";
         foreach (var part in parts)
         {
             current += "/" + part;
@@ -471,7 +460,10 @@ public class SshService : ISshService, IDisposable
 
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
         DisconnectInternalAsync().GetAwaiter().GetResult();
-        _lock.Dispose();
+        // Operations already in flight still release this semaphore while shutting
+        // down. Disposing it here would turn a disconnect into an unhandled error.
     }
 }

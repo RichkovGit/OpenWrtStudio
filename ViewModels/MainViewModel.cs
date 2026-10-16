@@ -80,11 +80,17 @@ public partial class MainViewModel : ObservableObject
             "Settings" or "10" => 10,
             _ => 0
         };
+        if (SelectedNavIndex is >= 2 and <= 9) IsExpertMode = true;
     }
 
     // --- Mode Switcher (Simple vs Expert) ---
     [ObservableProperty]
     private bool _isExpertMode = false;
+
+    partial void OnIsExpertModeChanged(bool value)
+    {
+        if (!value && SelectedNavIndex is >= 2 and <= 9) SelectedNavIndex = 0;
+    }
 
     [RelayCommand]
     public void ToggleExpertMode()
@@ -190,7 +196,7 @@ public partial class MainViewModel : ObservableObject
 
     private void OnProfilesSaved(object? sender, List<ConnectionProfile> list)
     {
-        App.Current?.Dispatcher?.Invoke(() =>
+        OnUiThread(() =>
         {
             var currentId = SelectedProfile?.Id;
             Profiles = new ObservableCollection<ConnectionProfile>(list);
@@ -215,33 +221,44 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     public async Task ConnectAsync()
     {
-        if (SelectedProfile == null)
+        var profile = SelectedProfile;
+        if (profile == null)
         {
             ShowAlert("Выберите или создайте профиль подключения в Настройках", true);
             return;
         }
 
         IsBusy = true;
-        BusyStatus = $"Подключение к {SelectedProfile.Host}:{SelectedProfile.Port}...";
-
-        var (success, msg) = await _ssh.ConnectAsync(SelectedProfile);
-        IsBusy = false;
-        BusyStatus = "";
-
-        if (success)
+        BusyStatus = $"Подключение к {profile.Host}:{profile.Port}...";
+        try
         {
-            ShowAlert($"Успешное подключение к {SelectedProfile.Host}!", false);
+            var (success, msg) = await _ssh.ConnectAsync(profile);
+            if (!success)
+            {
+                ShowAlert(msg, true);
+                return;
+            }
+            if (!_ssh.IsConnected || _ssh.CurrentProfile?.Id != profile.Id) return;
+            ShowAlert($"Успешное подключение к {profile.Host}!", false);
+            BusyStatus = "Загрузка данных роутера...";
             await DashboardVM.RefreshDashboardAsync();
-            await _sentinelService.ProbeHealthAsync();
+            if (!_ssh.IsConnected || _ssh.CurrentProfile?.Id != profile.Id) return;
+            if (_sentinelService.IsMonitoring) await _sentinelService.ProbeHealthAsync();
+            if (!_ssh.IsConnected || _ssh.CurrentProfile?.Id != profile.Id) return;
             _ = ClientsVM.LoadClientsAsync();
             _ = VpnVM.ScanCapabilitiesAsync();
             _ = RouterSettingsVM.LoadAllConfigsAsync();
             _ = ForkopVM.LoadDataAsync();
             _ = SchedulerVM.LoadJobsAsync();
         }
-        else
+        catch (Exception ex)
         {
-            ShowAlert(msg, true);
+            ShowAlert($"Ошибка подключения: {ex.Message}", true);
+        }
+        finally
+        {
+            IsBusy = false;
+            BusyStatus = "";
         }
     }
 
@@ -250,12 +267,22 @@ public partial class MainViewModel : ObservableObject
     {
         IsBusy = true;
         BusyStatus = "Отключение...";
-        await _ssh.DisconnectAsync();
-        IsBusy = false;
-        BusyStatus = "";
-        HasActiveIssue = false;
-        ActiveIssue = null;
-        ShowAlert("Отключено от роутера", false);
+        try
+        {
+            await _ssh.DisconnectAsync();
+            HasActiveIssue = false;
+            ActiveIssue = null;
+            ShowAlert("Отключено от роутера", false);
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Ошибка отключения: {ex.Message}", true);
+        }
+        finally
+        {
+            IsBusy = false;
+            BusyStatus = "";
+        }
     }
 
     [RelayCommand]
@@ -283,7 +310,7 @@ public partial class MainViewModel : ObservableObject
 
     private void OnConnectionChanged(object? sender, bool connected)
     {
-        App.Current?.Dispatcher?.Invoke(() =>
+        OnUiThread(() =>
         {
             IsConnected = connected;
             ConnectionStatus = connected
@@ -301,14 +328,24 @@ public partial class MainViewModel : ObservableObject
 
     private void OnSentinelIssueChanged(object? sender, SentinelIssue? issue)
     {
-        ActiveIssue = issue;
-        HasActiveIssue = issue != null;
-
-        if (issue != null)
+        OnUiThread(() =>
         {
-            var prefix = issue.IsProviderIssue ? "[Провайдер]" : "[Роутер]";
-            ShowAlert($"{prefix} {issue.Title}: {issue.Description}", issue.Severity == IssueSeverity.Critical);
-        }
+            var currentIssue = _ssh.IsConnected ? issue : null;
+            ActiveIssue = currentIssue;
+            HasActiveIssue = currentIssue != null;
+            if (currentIssue != null)
+            {
+                var prefix = currentIssue.IsProviderIssue ? "[Провайдер]" : "[Роутер]";
+                ShowAlert($"{prefix} {currentIssue.Title}: {currentIssue.Description}", currentIssue.Severity == IssueSeverity.Critical);
+            }
+        });
+    }
+
+    private static void OnUiThread(Action action)
+    {
+        var dispatcher = App.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.CheckAccess()) action();
+        else if (!dispatcher.HasShutdownStarted) dispatcher.Invoke(action);
     }
 
     public void ShowAlert(string message, bool isError)

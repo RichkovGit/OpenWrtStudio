@@ -1,7 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Text.Json;
@@ -32,11 +32,11 @@ public class UpdateService : IUpdateService
     public UpdateService()
     {
         _httpClient = new HttpClient();
-        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("OpenWrtStudio-Updater/2.5.0");
         _httpClient.Timeout = TimeSpan.FromSeconds(20);
 
         var ver = Assembly.GetExecutingAssembly().GetName().Version;
         CurrentVersion = ver != null ? new Version(ver.Major, ver.Minor, ver.Build) : new Version(2, 5, 0);
+        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd($"OpenWrtStudio-Updater/{CurrentVersion}");
     }
 
     public UpdateService(HttpClient httpClient, Version currentVersion)
@@ -57,11 +57,12 @@ public class UpdateService : IUpdateService
         try
         {
             using var response = await _httpClient.GetAsync(ReleasesApiUrl, HttpCompletionOption.ResponseHeadersRead, ct);
-            if (!response.IsSuccessStatusCode)
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 // If 404 (e.g. no releases created yet), return current version as latest
                 return result;
             }
+            response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);
             using var doc = JsonDocument.Parse(json);
@@ -82,7 +83,7 @@ public class UpdateService : IUpdateService
                 result.Changelog = bodyElem.GetString() ?? "";
             }
 
-            if (root.TryGetProperty("published_at", out var pubElem) && pubElem.TryGetDateTime(out var dt))
+            if (root.TryGetProperty("published_at", out var pubElem) && pubElem.ValueKind == JsonValueKind.String && pubElem.TryGetDateTime(out var dt))
             {
                 result.PublishedAt = dt;
             }
@@ -91,12 +92,9 @@ public class UpdateService : IUpdateService
             var rawVer = result.TagName.TrimStart('v', 'V').Trim();
             if (Version.TryParse(rawVer, out var parsedVersion))
             {
-                result.LatestVersion = parsedVersion;
+                result.LatestVersion = new Version(parsedVersion.Major, parsedVersion.Minor, Math.Max(0, parsedVersion.Build));
             }
-            else if (rawVer.Count(c => c == '.') == 1 && Version.TryParse(rawVer + ".0", out var twoPartVer))
-            {
-                result.LatestVersion = twoPartVer;
-            }
+            else throw new InvalidDataException("GitHub вернул некорректный номер версии.");
 
             // Find best asset (Installer .exe preferred, or portable zip)
             if (root.TryGetProperty("assets", out var assetsElem) && assetsElem.ValueKind == JsonValueKind.Array)
@@ -104,25 +102,23 @@ public class UpdateService : IUpdateService
                 string? bestUrl = null;
                 string? bestName = null;
                 long bestSize = 0;
+                int bestRank = 0;
 
                 foreach (var asset in assetsElem.EnumerateArray())
                 {
-                    var name = asset.GetProperty("name").GetString() ?? "";
-                    var url = asset.GetProperty("browser_download_url").GetString() ?? "";
-                    var size = asset.TryGetProperty("size", out var s) ? s.GetInt64() : 0;
-
-                    if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                    if (!asset.TryGetProperty("name", out var assetName) || assetName.ValueKind != JsonValueKind.String ||
+                        !asset.TryGetProperty("browser_download_url", out var assetUrl) || assetUrl.ValueKind != JsonValueKind.String)
+                        continue;
+                    var name = assetName.GetString() ?? "";
+                    var url = assetUrl.GetString() ?? "";
+                    if (!IsTrustedReleaseUrl(url, out _)) continue;
+                    var size = asset.TryGetProperty("size", out var s) && s.ValueKind == JsonValueKind.Number && s.TryGetInt64(out var parsedSize) ? parsedSize : 0;
+                    int rank = name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+                        ? (name.Contains("Setup", StringComparison.OrdinalIgnoreCase) ? 3 : 2)
+                        : name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+                    if (rank > bestRank)
                     {
-                        if (name.Contains("Setup", StringComparison.OrdinalIgnoreCase) || bestUrl == null)
-                        {
-                            bestUrl = url;
-                            bestName = name;
-                            bestSize = size;
-                            if (name.Contains("Setup", StringComparison.OrdinalIgnoreCase)) break;
-                        }
-                    }
-                    else if (bestUrl == null && name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
-                    {
+                        bestRank = rank;
                         bestUrl = url;
                         bestName = name;
                         bestSize = size;
@@ -142,6 +138,7 @@ public class UpdateService : IUpdateService
         catch (Exception ex)
         {
             Debug.WriteLine($"[UpdateService] CheckForUpdates error: {ex.Message}");
+            throw;
         }
 
         return result;
@@ -149,45 +146,70 @@ public class UpdateService : IUpdateService
 
     public async Task<string> DownloadUpdateAsync(string downloadUrl, IProgress<double>? progress = null, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(downloadUrl))
-            throw new ArgumentException("Download URL cannot be empty", nameof(downloadUrl));
-
-        var tempDir = Path.GetTempPath();
-        var ext = Path.GetExtension(downloadUrl);
-        if (string.IsNullOrEmpty(ext)) ext = ".exe";
-        var targetFile = Path.Combine(tempDir, $"OpenWrtStudio_Update_{DateTime.Now:yyyyMMdd_HHmmss}{ext}");
-
-        using var response = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
-        response.EnsureSuccessStatusCode();
-
-        var totalBytes = response.Content.Headers.ContentLength ?? -1L;
-        await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
-        await using var fileStream = new FileStream(targetFile, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
-
-        var buffer = new byte[16384];
-        long totalRead = 0;
-        int read;
-
-        while ((read = await contentStream.ReadAsync(buffer, 0, buffer.Length, ct)) > 0)
+        if (!IsTrustedReleaseUrl(downloadUrl, out var uri))
+            throw new ArgumentException("Обновления можно загружать только из официальных релизов OpenWrtStudio на GitHub.", nameof(downloadUrl));
+        var ext = Path.GetExtension(uri!.AbsolutePath).ToLowerInvariant();
+        if (ext is not ".exe" and not ".zip")
+            throw new ArgumentException("Неподдерживаемый формат обновления.", nameof(downloadUrl));
+        var targetFile = Path.Combine(Path.GetTempPath(), $"OpenWrtStudio_Update_{Guid.NewGuid():N}{ext}");
+        try
         {
-            await fileStream.WriteAsync(buffer, 0, read, ct);
-            totalRead += read;
-
-            if (totalBytes > 0 && progress != null)
+            using var response = await _httpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct);
+            response.EnsureSuccessStatusCode();
+            var totalBytes = response.Content.Headers.ContentLength;
+            await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
+            await using (var fileStream = new FileStream(targetFile, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 8192, true))
             {
-                var percentage = (double)totalRead / totalBytes * 100.0;
-                progress.Report(percentage);
+                var buffer = new byte[16384];
+                long totalRead = 0;
+                int read;
+                while ((read = await contentStream.ReadAsync(buffer.AsMemory(), ct)) > 0)
+                {
+                    await fileStream.WriteAsync(buffer.AsMemory(0, read), ct);
+                    totalRead += read;
+                    if (totalBytes > 0)
+                        progress?.Report(Math.Min(99, (double)totalRead / totalBytes.Value * 100));
+                }
+                if (totalRead == 0 || (totalBytes.HasValue && totalRead != totalBytes.Value))
+                    throw new InvalidDataException("Обновление загружено не полностью. Повторите скачивание.");
+                await fileStream.FlushAsync(ct);
+                fileStream.Position = 0;
+                var signature = new byte[2];
+                var signatureLength = await fileStream.ReadAsync(signature.AsMemory(), ct);
+                if (signatureLength != 2 || (ext == ".exe"
+                    ? signature[0] != 'M' || signature[1] != 'Z'
+                    : signature[0] != 'P' || signature[1] != 'K'))
+                    throw new InvalidDataException("Сервер вернул некорректный файл обновления.");
             }
+            ct.ThrowIfCancellationRequested();
+            progress?.Report(100.0);
+            return targetFile;
         }
-
-        progress?.Report(100.0);
-        return targetFile;
+        catch
+        {
+            if (File.Exists(targetFile)) File.Delete(targetFile);
+            throw;
+        }
     }
+
+    private static bool IsTrustedReleaseUrl(string url, out Uri? uri) =>
+        Uri.TryCreate(url, UriKind.Absolute, out uri) && uri.Scheme == Uri.UriSchemeHttps &&
+        uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase) && uri.IsDefaultPort &&
+        string.IsNullOrEmpty(uri.UserInfo) &&
+        uri.AbsolutePath.StartsWith($"/{RepoOwnerAndName}/releases/download/", StringComparison.OrdinalIgnoreCase);
 
     public void LaunchInstallerAndExit(string installerPath)
     {
         if (!File.Exists(installerPath))
             throw new FileNotFoundException("Installer file not found", installerPath);
+
+        if (Path.GetExtension(installerPath).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+        {
+            Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{Path.GetFullPath(installerPath)}\"") { UseShellExecute = true });
+            return; // Portable archives require extraction; keep the current app open.
+        }
+        if (!Path.GetExtension(installerPath).Equals(".exe", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Неподдерживаемый формат программы установки.", nameof(installerPath));
 
         var psi = new ProcessStartInfo
         {
@@ -196,7 +218,7 @@ public class UpdateService : IUpdateService
         };
 
         Process.Start(psi);
-        Application.Current.Dispatcher.Invoke(() =>
+        Application.Current?.Dispatcher.Invoke(() =>
         {
             Application.Current.Shutdown();
         });

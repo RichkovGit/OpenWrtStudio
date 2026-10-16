@@ -68,8 +68,17 @@ public partial class App : Application
         services.AddSingleton<MainWindow>();
     }
 
-    private const string MutexName = @"Global\OpenWrtStudio_SingleInstance_Mutex_98f12a";
-    private const string EventName = @"Global\OpenWrtStudio_ActivateInstance_Event_98f12a";
+    private static readonly string InstanceSuffix = GetInstanceSuffix();
+    private static readonly string MutexName = @"Global\OpenWrtStudio_SingleInstance_Mutex_98f12a" + InstanceSuffix;
+    private static readonly string EventName = @"Global\OpenWrtStudio_ActivateInstance_Event_98f12a" + InstanceSuffix;
+
+    private static string GetInstanceSuffix()
+    {
+        var directory = Environment.GetEnvironmentVariable("OPENWRT_STUDIO_DATA_DIR");
+        if (string.IsNullOrWhiteSpace(directory)) return "";
+        return "_" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(directory).ToUpperInvariant())))[..16];
+    }
 
     private Mutex? _instanceMutex;
     private EventWaitHandle? _activateEvent;
@@ -186,7 +195,6 @@ public partial class App : Application
                 mainWindow.Show();
             }
 
-            bgMonitor.StartMonitoring(25);
             bgMonitor.OnRouterStatePolled += info =>
             {
                 if (info != null)
@@ -195,9 +203,10 @@ public partial class App : Application
                 }
                 else
                 {
-                    trayManager.UpdateStatusText("Подключено");
+                    trayManager.UpdateStatusText("Не подключено");
                 }
             };
+            bgMonitor.StartMonitoring(25);
 
             await mainViewModel.InitializeAsync();
             await settingsViewModel.InitializeAsync();
@@ -253,7 +262,10 @@ public partial class App : Application
     {
         try
         {
-            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenWrtStudio");
+            var overrideDirectory = Environment.GetEnvironmentVariable("OPENWRT_STUDIO_DATA_DIR");
+            var dir = string.IsNullOrWhiteSpace(overrideDirectory)
+                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenWrtStudio")
+                : Path.GetFullPath(overrideDirectory);
             Directory.CreateDirectory(dir);
             var path = Path.Combine(dir, "crash.log");
             File.AppendAllText(path, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {ex}\n\n");

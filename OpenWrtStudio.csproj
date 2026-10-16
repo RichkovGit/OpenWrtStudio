@@ -12,12 +12,16 @@
     <SelfContained>true</SelfContained>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-    <Version>2.5.18</Version>
-    <AssemblyVersion>2.5.18.0</AssemblyVersion>
-    <FileVersion>2.5.18.0</FileVersion>
+    <Version>2.5.19</Version>
+    <AssemblyVersion>2.5.19.0</AssemblyVersion>
+    <FileVersion>2.5.19.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="OpenWrtStudio.Tests\**\*.cs" />
+    <EmbeddedResource Remove="OpenWrtStudio.Tests\**\*" />
+    <None Remove="OpenWrtStudio.Tests\**\*" />
+    <Page Remove="OpenWrtStudio.Tests\**\*.xaml" />
     <Resource Include="Assets\app.ico" />
     <Resource Include="Assets\app.png" />
   </ItemGroup>

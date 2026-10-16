@@ -17,6 +17,7 @@ public interface IThemeService
     ColorThemeItem CurrentTheme { get; }
     bool IsDarkMode { get; set; }
     bool StartMinimizedToTray { get; set; }
+    bool AutoCheckUpdates { get; set; }
     void ApplyTheme(string themeId, bool isDarkMode);
     (string themeId, bool isDarkMode) LoadSavedPreferences();
     void SavePreferences();
@@ -27,6 +28,7 @@ public class ThemePreferences
     public string ThemeId { get; set; } = "cyan";
     public bool IsDarkMode { get; set; } = true;
     public bool StartMinimizedToTray { get; set; } = false;
+    public bool AutoCheckUpdates { get; set; } = true;
 }
 
 public class ThemeService : IThemeService
@@ -37,11 +39,13 @@ public class ThemeService : IThemeService
     public IReadOnlyList<ColorThemeItem> AvailableThemes => _themes;
     public ColorThemeItem CurrentTheme { get; private set; }
     public bool IsDarkMode { get; set; } = true;
+    public bool AutoCheckUpdates { get; set; } = true;
 
     public ThemeService()
     {
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var dir = Path.Combine(appData, "OpenWrtStudio");
+        var overrideDirectory = Environment.GetEnvironmentVariable("OPENWRT_STUDIO_DATA_DIR");
+        var dir = string.IsNullOrWhiteSpace(overrideDirectory) ? Path.Combine(appData, "OpenWrtStudio") : Path.GetFullPath(overrideDirectory);
         Directory.CreateDirectory(dir);
         _configPath = Path.Combine(dir, "theme.json");
 
@@ -74,6 +78,7 @@ public class ThemeService : IThemeService
                     if (found != null) CurrentTheme = found;
                     IsDarkMode = pref.IsDarkMode;
                     StartMinimizedToTray = pref.StartMinimizedToTray;
+                    AutoCheckUpdates = pref.AutoCheckUpdates;
                     return (pref.ThemeId, pref.IsDarkMode);
                 }
             }
@@ -91,7 +96,8 @@ public class ThemeService : IThemeService
             {
                 ThemeId = CurrentTheme?.Id ?? "cyan",
                 IsDarkMode = IsDarkMode,
-                StartMinimizedToTray = StartMinimizedToTray
+                StartMinimizedToTray = StartMinimizedToTray,
+                AutoCheckUpdates = AutoCheckUpdates
             };
             var json = JsonSerializer.Serialize(pref, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(_configPath, json);

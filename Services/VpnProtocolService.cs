@@ -309,15 +309,13 @@ public class VpnProtocolService : IVpnProtocolService
     public async Task<(bool Success, string Message)> DeleteAmneziaWgConfigAsync(string ifaceName)
     {
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
-        if (string.IsNullOrWhiteSpace(ifaceName)) return (false, "Имя интерфейса не указано");
+        if (!ShellHelper.IsValidNetworkInterface(ifaceName)) return (false, "Некорректное имя интерфейса (до 15 букв, цифр, _ или -)");
 
-        var cleanIface = ShellHelper.SanitizeIdentifier(ifaceName);
+        var cleanIface = ifaceName;
         var sb = new StringBuilder();
-        sb.AppendLine($"ifdown {cleanIface} 2>/dev/null");
-        sb.AppendLine($"uci -q delete network.{cleanIface}");
-        sb.AppendLine($"uci -q delete network.{cleanIface}_peer");
-        sb.AppendLine($"for s in $(uci show network | grep -E '=(wireguard|amneziawg)_{cleanIface}' | cut -d'.' -f2 | cut -d'=' -f1); do uci -q delete network.$s; done");
-        sb.AppendLine($"for s in $(uci show network | grep -E '\\.interface=\'{cleanIface}\'' | cut -d'.' -f2); do uci -q delete network.$s; done");
+        sb.AppendLine("set -e");
+        sb.AppendLine($"ifdown {ShellHelper.EscapeArg(cleanIface)} 2>/dev/null || true");
+        AppendRemoveAmneziaSections(sb, cleanIface);
         sb.AppendLine("uci commit network");
         sb.AppendLine("/etc/init.d/network reload 2>/dev/null || /etc/init.d/network restart");
 
@@ -332,10 +330,10 @@ public class VpnProtocolService : IVpnProtocolService
     public async Task<(bool Success, string Message)> RestartAmneziaWgAsync(string ifaceName)
     {
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
-        if (string.IsNullOrWhiteSpace(ifaceName)) return (false, "Имя интерфейса не указано");
+        if (!ShellHelper.IsValidNetworkInterface(ifaceName)) return (false, "Некорректное имя интерфейса (до 15 букв, цифр, _ или -)");
 
-        var cleanIface = ShellHelper.SanitizeIdentifier(ifaceName);
-        var (code, _, err) = await _ssh.ExecuteCommandAsync($"ifdown {cleanIface} 2>/dev/null; sleep 1; ifup {cleanIface} 2>/dev/null", 10);
+        var cleanIface = ifaceName;
+        var (code, _, err) = await _ssh.ExecuteCommandAsync($"ifdown {ShellHelper.EscapeArg(cleanIface)} 2>/dev/null; sleep 1; ifup {ShellHelper.EscapeArg(cleanIface)} 2>/dev/null", 10);
         if (code == 0)
         {
             return (true, $"Интерфейс {cleanIface} перезапущен (ifdown/ifup).");
@@ -409,23 +407,28 @@ public class VpnProtocolService : IVpnProtocolService
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
 
         var iface = string.IsNullOrWhiteSpace(config.InterfaceName) ? "awg0" : config.InterfaceName;
+        if (!ShellHelper.IsValidNetworkInterface(iface))
+            return (false, "Некорректное имя интерфейса (до 15 букв, цифр, _ или -)");
         var peerName = $"{iface}_peer";
 
         string endpointHost = "";
         string endpointPort = "51820";
-        if (!string.IsNullOrWhiteSpace(config.Endpoint) && config.Endpoint.Contains(":"))
+        if (!string.IsNullOrWhiteSpace(config.Endpoint))
         {
-            var p = config.Endpoint.Split(':');
-            endpointHost = p[0];
-            endpointPort = p[1];
+            // WireGuard uses host:port, including [IPv6]:port. Splitting on ':' truncates IPv6.
+            var match = Regex.Match(config.Endpoint.Trim(), @"\A(?:\[([^\]]+)\]|([^:\s]+)):([0-9]{1,5})\z");
+            if (!match.Success || !int.TryParse(match.Groups[3].Value, out var port) || port < 1 || port > 65535)
+                return (false, "Укажите адрес VPN-сервера в формате host:port или [IPv6]:port");
+            endpointHost = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
+            if (Uri.CheckHostName(endpointHost) == UriHostNameType.Unknown)
+                return (false, "Некорректный адрес VPN-сервера");
+            endpointPort = port.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
         var sb = new StringBuilder();
+        sb.AppendLine("set -e");
         sb.AppendLine($"# Configuration for {iface}");
-        sb.AppendLine($"uci -q delete network.{iface}");
-        sb.AppendLine($"uci -q delete network.{peerName}");
-        sb.AppendLine($"for s in $(uci show network | grep -E '=(wireguard|amneziawg)_{Regex.Escape(iface)}' | cut -d'.' -f2 | cut -d'=' -f1); do uci -q delete network.$s; done");
-        sb.AppendLine($"for s in $(uci show network | grep -E '\\.interface=\'{Regex.Escape(iface)}\'' | cut -d'.' -f2); do uci -q delete network.$s; done");
+        AppendRemoveAmneziaSections(sb, iface);
         sb.AppendLine($"uci set network.{iface}=interface");
         sb.AppendLine($"uci set network.{iface}.proto='amneziawg'");
         sb.AppendLine($"uci set network.{iface}.private_key={ShellHelper.EscapeArg(config.PrivateKey)}");
@@ -438,6 +441,8 @@ public class VpnProtocolService : IVpnProtocolService
         {
             sb.AppendLine($"uci add_list network.{iface}.addresses={ShellHelper.EscapeArg(a.Trim())}");
         }
+        foreach (var dns in config.Dns.Split(new[] { ',', ';', ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries))
+            sb.AppendLine($"uci add_list network.{iface}.dns={ShellHelper.EscapeArg(dns.Trim())}");
 
         // AmneziaWG Obfuscation parameters
         sb.AppendLine($"uci set network.{iface}.jc='{config.Jc}'");
@@ -482,6 +487,17 @@ public class VpnProtocolService : IVpnProtocolService
         }
 
         return (false, $"Ошибка применения конфигурации AWG: {err}\n{outStr}");
+    }
+
+    private static void AppendRemoveAmneziaSections(StringBuilder script, string iface)
+    {
+        script.AppendLine($"uci -q delete network.{iface} || true");
+        script.AppendLine($"uci -q delete network.{iface}_peer || true");
+        var peerType = ShellHelper.EscapeArg($"=(wireguard|amneziawg)_{iface}$");
+        var peerInterface = ShellHelper.EscapeArg($".interface='{iface}'");
+        // Stable cfg IDs keep every peer addressable while deleting multiple anonymous sections.
+        script.AppendLine($"for s in $(uci -X show network | grep -E {peerType} | cut -d'.' -f2 | cut -d'=' -f1); do uci -q delete \"network.$s\" || true; done");
+        script.AppendLine($"for s in $(uci -X show network | grep -F {peerInterface} | cut -d'.' -f2); do uci -q delete \"network.$s\" || true; done");
     }
 
     public async Task<(bool Success, string Message)> ApplySingboxConfigAsync(SingboxQuickConfig config)

@@ -34,6 +34,12 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _isDarkMode = true;
 
+    partial void OnIsDarkModeChanged(bool value)
+    {
+        _themeService.ApplyTheme(SelectedColorTheme?.Id ?? "cyan", value);
+        ThemeStatusText = value ? "Активирована тёмная тема" : "Активирована светлая тема";
+    }
+
     [ObservableProperty]
     private ObservableCollection<ColorThemeItem> _colorThemes = new();
 
@@ -70,6 +76,12 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _autoCheckUpdates = true;
+
+    partial void OnAutoCheckUpdatesChanged(bool value)
+    {
+        _themeService.AutoCheckUpdates = value;
+        _themeService.SavePreferences();
+    }
 
     public string CurrentAppVersionString => $"v{_updateService.CurrentVersion.Major}.{_updateService.CurrentVersion.Minor}.{_updateService.CurrentVersion.Build}";
 
@@ -110,6 +122,7 @@ public partial class SettingsViewModel : ObservableObject
         }
 
         StartMinimizedToTray = _themeService.StartMinimizedToTray;
+        AutoCheckUpdates = _themeService.AutoCheckUpdates;
 
         if (AutoCheckUpdates)
         {
@@ -135,19 +148,32 @@ public partial class SettingsViewModel : ObservableObject
     public async Task DeleteProfileAsync(ConnectionProfile? profile)
     {
         if (profile == null) return;
-        Profiles.Remove(profile);
-        if (CurrentEditingProfile == profile)
+        try
         {
-            CurrentEditingProfile = Profiles.Count > 0 ? Profiles[0] : null;
+            var remaining = new System.Collections.Generic.List<ConnectionProfile>(Profiles);
+            remaining.Remove(profile);
+            await _profileService.SaveProfilesAsync(remaining);
+            Profiles.Remove(profile);
+            if (CurrentEditingProfile == profile)
+                CurrentEditingProfile = Profiles.Count > 0 ? Profiles[0] : null;
+            TestStatus = "Профиль удалён.";
         }
-        await _profileService.SaveProfilesAsync(new(Profiles));
+        catch (Exception ex) { TestStatus = $"Не удалось удалить профиль: {ex.Message}"; }
     }
 
     [RelayCommand]
     public async Task SaveProfilesAsync()
     {
-        await _profileService.SaveProfilesAsync(new(Profiles));
-        TestStatus = "Профили успешно сохранены!";
+        try
+        {
+            foreach (var profile in Profiles)
+                if (string.IsNullOrWhiteSpace(profile.Name) || string.IsNullOrWhiteSpace(profile.Host)
+                    || string.IsNullOrWhiteSpace(profile.Username) || profile.Port is < 1 or > 65535)
+                    throw new ArgumentException("Укажите название, хост, имя пользователя и порт от 1 до 65535 для каждого профиля.");
+            await _profileService.SaveProfilesAsync(new(Profiles));
+            TestStatus = "Профили успешно сохранены!";
+        }
+        catch (Exception ex) { TestStatus = $"Не удалось сохранить профили: {ex.Message}"; }
     }
 
     [RelayCommand]
@@ -197,8 +223,6 @@ public partial class SettingsViewModel : ObservableObject
     public void ToggleTheme()
     {
         IsDarkMode = !IsDarkMode;
-        _themeService.ApplyTheme(SelectedColorTheme?.Id ?? "cyan", IsDarkMode);
-        ThemeStatusText = IsDarkMode ? "Активирована тёмная тема" : "Активирована светлая тема";
     }
 
     [RelayCommand]
@@ -250,12 +274,14 @@ public partial class SettingsViewModel : ObservableObject
             UpdateStatusText = "Запуск программы установки...";
             await Task.Delay(800);
             _updateService.LaunchInstallerAndExit(downloadedFile);
+            if (Path.GetExtension(downloadedFile).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+                UpdateStatusText = "Архив загружен. Распакуйте его в новую папку и запустите OpenWrtStudio.exe.";
         }
         catch (Exception ex)
         {
             UpdateStatusText = $"Ошибка скачивания: {ex.Message}";
-            IsDownloadingUpdate = false;
         }
+        finally { IsDownloadingUpdate = false; }
     }
 
     [RelayCommand]

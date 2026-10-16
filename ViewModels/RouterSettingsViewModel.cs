@@ -179,7 +179,8 @@ public partial class RouterSettingsViewModel : ObservableObject
 
         if (success)
         {
-            PortForwards.Remove(rule);
+            // Anonymous UCI section identifiers can change after a rule is deleted.
+            PortForwards = new ObservableCollection<PortForwardRule>(await _routerConfigService.GetPortForwardRulesAsync());
         }
     }
 

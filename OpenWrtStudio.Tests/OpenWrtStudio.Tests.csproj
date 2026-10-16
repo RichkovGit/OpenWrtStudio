@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\OpenWrtStudio\OpenWrtStudio.csproj" />
+    <ProjectReference Include="..\OpenWrtStudio.csproj" />
   </ItemGroup>
 
   <ItemGroup>

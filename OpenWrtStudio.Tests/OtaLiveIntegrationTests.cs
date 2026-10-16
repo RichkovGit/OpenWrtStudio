@@ -9,7 +9,7 @@ namespace OpenWrtStudio.Tests;
 
 public class OtaLiveIntegrationTests
 {
-    [Fact]
+    [LiveGitHubFact]
     public async Task Ota_LiveGitHub_Reports_v2_5_1_AsAvailableUpdate_For_v2_5_0()
     {
         using var httpClient = new HttpClient();
@@ -33,7 +33,7 @@ public class OtaLiveIntegrationTests
         Assert.NotEmpty(info.Changelog);
     }
 
-    [Fact]
+    [LiveGitHubFact]
     public async Task Ota_LiveGitHub_Reports_UpToDate_For_FutureVersion()
     {
         using var httpClient = new HttpClient();
@@ -54,7 +54,7 @@ public class OtaLiveIntegrationTests
         Assert.False(info.IsUpdateAvailable, "v99.0.0 should be recognized as already up to date");
     }
 
-    [Fact]
+    [LiveGitHubFact]
     public async Task Ota_DownloadStream_CanDownloadUpdateFile()
     {
         using var httpClient = new HttpClient();

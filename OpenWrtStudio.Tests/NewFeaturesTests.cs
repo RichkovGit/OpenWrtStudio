@@ -190,7 +190,7 @@ PersistentKeepalive = 25
     [Fact]
     public void ApplicationIcon_FileExistsAndHasValidMultiSizeHeaders()
     {
-        var icoPath = @"C:\Users\danny\.gemini\antigravity\scratch\OpenWrtStudio\Assets\app.ico";
+        var icoPath = System.IO.Path.Combine(TestPaths.RepositoryRoot, "Assets", "app.ico");
         Assert.True(System.IO.File.Exists(icoPath), "app.ico must exist in Assets");
 
         var bytes = System.IO.File.ReadAllBytes(icoPath);

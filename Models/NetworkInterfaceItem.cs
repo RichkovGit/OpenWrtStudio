@@ -4,11 +4,11 @@ public class NetworkInterfaceItem
 {
     public string Name { get; set; } = "lan";
     public string Device { get; set; } = "br-lan";
-    public string IpAddress { get; set; } = "192.168.1.1";
-    public string Netmask { get; set; } = "255.255.255.0";
+    public string IpAddress { get; set; } = "";
+    public string Netmask { get; set; } = "";
     public string Gateway { get; set; } = "";
     public string MacAddress { get; set; } = "";
-    public bool IsUp { get; set; } = true;
+    public bool IsUp { get; set; } = false;
     public long RxBytes { get; set; }
     public long TxBytes { get; set; }
 

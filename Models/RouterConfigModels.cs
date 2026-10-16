@@ -26,6 +26,8 @@ public class WifiIfaceConfig
 
 public class LanDhcpConfig
 {
+    // Only a successfully loaded snapshot may authorize deleting existing hosts.
+    internal List<string>? LoadedStaticLeaseSections { get; set; }
     public string IpAddress { get; set; } = "192.168.1.1";
     public string Netmask { get; set; } = "255.255.255.0";
     public int DhcpStart { get; set; } = 100;

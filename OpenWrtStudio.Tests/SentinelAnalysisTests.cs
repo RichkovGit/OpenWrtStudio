@@ -141,16 +141,16 @@ tun:none
         Assert.Null(issue);
     }
 
-    [Fact]
+    [LiveRouterFact]
     public async System.Threading.Tasks.Task LiveProbeTest()
     {
         var ssh = new SshService();
         var conn = await ssh.ConnectAsync(new ConnectionProfile
         {
-            Host = "192.168.10.1",
+            Host = Environment.GetEnvironmentVariable("OPENWRT_TEST_HOST")!,
             Port = 22,
-            Username = "root",
-            Password = "danik05092005"
+            Username = Environment.GetEnvironmentVariable("OPENWRT_TEST_USER") ?? "root",
+            Password = Environment.GetEnvironmentVariable("OPENWRT_TEST_PASSWORD")!
         });
         if (!conn.Success) return;
         var sentinel = new SentinelService(ssh);

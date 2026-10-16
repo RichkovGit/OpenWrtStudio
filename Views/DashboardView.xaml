@@ -9,25 +9,55 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="24">
             <!-- Header with Refresh -->
-            <Grid Margin="0,0,0,18">
+            <Grid Margin="0,0,0,22">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel>
-                    <TextBlock Text="Центр управления OpenWrt" FontSize="26" FontWeight="SemiBold" />
-                    <TextBlock Text="Обзор аппаратных ресурсов, сетевых интерфейсов и быстрое управление" 
-                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,0" />
+                    <TextBlock Text="Обзор сети" FontSize="30" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding LastUpdatedText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,6,0,0" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <ui:Button Appearance="Secondary" Content="Сохранить отчёт" Margin="0,0,8,0" Command="{Binding ExportReportCommand}" ToolTip="Сводка ресурсов без IP/MAC-адресов, паролей и ключей" />
                     <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Content="Обновить" 
-                               Command="{Binding RefreshDashboardCommand}" />
+                               Command="{Binding RefreshDashboardCommand}" IsEnabled="{Binding IsConnected}" />
                 </StackPanel>
             </Grid>
 
+            <Border CornerRadius="16" Padding="28" Margin="0,0,0,20" Background="#122B3A"
+                    Visibility="{Binding IsConnected, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="200" /></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="ДОБРО ПОЖАЛОВАТЬ В STUDIO" FontSize="11" FontWeight="Bold" Foreground="#70D9F2" />
+                        <TextBlock Text="Вся сеть. Один центр управления." FontSize="27" FontWeight="SemiBold" Foreground="White" Margin="0,14,0,10" TextWrapping="Wrap" />
+                        <TextBlock Text="Подключите OpenWrt по SSH, чтобы видеть состояние роутера,&#10;находить неполадки и управлять устройствами." Foreground="#C1D7E2" TextWrapping="Wrap" LineHeight="23" />
+                        <WrapPanel Margin="0,22,0,0">
+                            <ui:Button Content="Создать профиль" Appearance="Primary" Margin="0,0,10,6" Command="{Binding DataContext.NavigateToCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="Settings" />
+                            <ui:Button Content="Найти роутер" Appearance="Secondary" Margin="0,0,0,6" Command="{Binding DataContext.AutoDiscoverRouterCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                        </WrapPanel>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <Border Width="104" Height="104" CornerRadius="28" Background="#203F50">
+                            <ui:SymbolIcon Symbol="Router24" FontSize="52" Foreground="#70D9F2" />
+                        </Border>
+                        <TextBlock Text="ГОТОВ К ПОДКЛЮЧЕНИЮ" FontSize="10" Foreground="#A4C4D4" Margin="0,17,0,0" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <UniformGrid Columns="3" Margin="0,0,0,20" Visibility="{Binding IsConnected, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                <ui:Card Margin="0,0,8,0"><StackPanel><TextBlock Text="01  Подключитесь к сети" FontWeight="SemiBold" /><TextBlock Text="Компьютер и роутер должны быть доступны друг другу по LAN или Wi-Fi." TextWrapping="Wrap" Margin="0,9,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" /></StackPanel></ui:Card>
+                <ui:Card Margin="4,0,4,0"><StackPanel><TextBlock Text="02  Сохраните профиль" FontWeight="SemiBold" /><TextBlock Text="Укажите адрес роутера, SSH-порт и пароль или путь к закрытому ключу." TextWrapping="Wrap" Margin="0,9,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" /></StackPanel></ui:Card>
+                <ui:Card Margin="8,0,0,0"><StackPanel><TextBlock Text="03  Откройте обзор" FontWeight="SemiBold" /><TextBlock Text="Нажмите «Подключить» вверху. Показатели обновляются каждые 6 секунд." TextWrapping="Wrap" Margin="0,9,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" /></StackPanel></ui:Card>
+            </UniformGrid>
+
+            <ui:InfoBar Title="Подключено" Message="Получаем первый снимок состояния роутера…" IsOpen="{Binding IsLoading}" Severity="Informational" Margin="0,0,0,16" />
+
             <!-- Quick Router Specs Banner -->
-            <ui:Card Margin="0,0,0,16">
+            <ui:Card Margin="0,0,0,16" Visibility="{Binding HasSnapshot, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -60,11 +90,11 @@
 
             <!-- Status Banner if Action Performed -->
             <ui:InfoBar Title="Статус операции" Message="{Binding ActionStatus}" 
-                        IsOpen="{Binding ActionStatus, Converter={StaticResource BooleanToVisibilityConverter}}" 
+                        IsOpen="{Binding HasActionStatus}"
                         Severity="Informational" Margin="0,0,0,16" />
 
             <!-- Metrics Cards Grid -->
-            <UniformGrid Columns="3" Margin="0,0,0,16">
+            <UniformGrid Columns="3" Margin="0,0,0,16" Visibility="{Binding HasSnapshot, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <!-- CPU Load -->
                 <ui:Card Margin="0,0,10,0">
                     <StackPanel>
@@ -106,7 +136,7 @@
             </UniformGrid>
 
             <!-- Quick Action Bar -->
-            <ui:Card Margin="0,0,0,16">
+            <ui:Card Margin="0,0,0,16" Visibility="{Binding HasSnapshot, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <StackPanel>
                     <TextBlock Text="Быстрые системные действия" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
                     <WrapPanel>
@@ -119,7 +149,7 @@
             </ui:Card>
 
             <!-- Network Interfaces Table -->
-            <ui:Card>
+            <ui:Card Visibility="{Binding HasSnapshot, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <StackPanel>
                     <TextBlock Text="Сетевые интерфейсы" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
                     <DataGrid ItemsSource="{Binding Interfaces}" AutoGenerateColumns="False" 
@@ -137,6 +167,19 @@
                     </DataGrid>
                 </StackPanel>
             </ui:Card>
+            <TextBlock Text="БЫСТРЫЙ ДОСТУП" FontSize="11" FontWeight="SemiBold" Margin="0,24,0,14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <UniformGrid Columns="3">
+                <ui:Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="18" Margin="0,0,8,0" Command="{Binding DataContext.NavigateToCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="Clients">
+                    <StackPanel><TextBlock Text="Устройства сети  →" FontWeight="SemiBold" /><TextBlock Text="Клиенты и DHCP · Ctrl+2" FontSize="11" Margin="0,7,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" /></StackPanel>
+                </ui:Button>
+                <ui:Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="18" Margin="4,0,4,0" Command="{Binding DataContext.NavigateToCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="Diagnostics">
+                    <StackPanel><TextBlock Text="Диагностика  →" FontWeight="SemiBold" /><TextBlock Text="Ping и трассировка · Ctrl+3" FontSize="11" Margin="0,7,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" /></StackPanel>
+                </ui:Button>
+                <ui:Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="18" Margin="8,0,0,0" Command="{Binding DataContext.NavigateToCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="Settings">
+                    <StackPanel><TextBlock Text="Настройки  →" FontWeight="SemiBold" /><TextBlock Text="Профили и оформление · Ctrl+," FontSize="11" Margin="0,7,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" /></StackPanel>
+                </ui:Button>
+            </UniformGrid>
+            <TextBlock Text="Показатели ресурсов доступны после подключения к реальному роутеру." Margin="0,22,0,0" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Visibility="{Binding IsConnected, Converter={StaticResource InverseBooleanToVisibilityConverter}}" />
         </StackPanel>
     </ScrollViewer>
 </UserControl>

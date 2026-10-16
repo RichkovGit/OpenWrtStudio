@@ -31,6 +31,20 @@ public static class ShellHelper
         return string.IsNullOrEmpty(sanitized) ? fallback : sanitized;
     }
 
+    /// <summary>Accepts named and anonymous UCI sections without changing their identity.</summary>
+    public static bool IsValidUciSection(string? section)
+    {
+        return !string.IsNullOrWhiteSpace(section)
+               && Regex.IsMatch(section, @"\A(?:[a-zA-Z0-9_\-]+|@[a-zA-Z0-9_\-]+\[-?[0-9]+\])\z");
+    }
+
+    /// <summary>Linux interface names used as UCI sections and shell arguments.</summary>
+    public static bool IsValidNetworkInterface(string? name)
+    {
+        return !string.IsNullOrWhiteSpace(name)
+               && Regex.IsMatch(name, @"\A[a-zA-Z0-9_][a-zA-Z0-9_\-]{0,14}\z");
+    }
+
     /// <summary>
     /// Validates if a host or IP target is safe for ping, traceroute, and nslookup.
     /// Prevents command injection via metacharacters like ;, &, |, `, $, \n.

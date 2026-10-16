@@ -233,18 +233,22 @@ echo '===SECTION:END==='
     {
         var lines = text.Split('\n');
         long total = 0, free = 0, buffers = 0, cached = 0;
+        long? available = null;
         foreach (var line in lines)
         {
             if (line.StartsWith("MemTotal:")) total = ParseKb(line);
             else if (line.StartsWith("MemFree:")) free = ParseKb(line);
             else if (line.StartsWith("Buffers:")) buffers = ParseKb(line);
             else if (line.StartsWith("Cached:")) cached = ParseKb(line);
+            else if (line.StartsWith("MemAvailable:")) available = ParseKb(line);
         }
 
         info.RamTotalKB = total;
         info.RamFreeKB = free;
         info.RamBufferedKB = buffers + cached;
-        info.RamUsedKB = Math.Max(0, total - free - buffers - cached);
+        // MemAvailable includes reclaimable kernel memory and is the kernel's
+        // estimate of memory applications can actually use without swapping.
+        info.RamUsedKB = Math.Clamp(total - (available ?? (free + buffers + cached)), 0, total);
     }
 
     private static long ParseKb(string line)
@@ -320,12 +324,54 @@ echo '===SECTION:END==='
             catch { }
         }
 
-        // Fallback to ip addr
-        var (ipExit, ipOut, _) = await _ssh.ExecuteCommandAsync("ip -s link 2>/dev/null || ifconfig", 5);
+        // Read actual interfaces on routers without ubus; never invent addresses.
+        var (ipExit, ipOut, _) = await _ssh.ExecuteCommandAsync("(ip -o link show && ip -o -4 addr show) 2>/dev/null || ifconfig", 5);
         if (ipExit == 0 && !string.IsNullOrWhiteSpace(ipOut))
         {
-            list.Add(new NetworkInterfaceItem { Name = "lan", Device = "br-lan", IpAddress = "192.168.1.1", IsUp = true });
-            list.Add(new NetworkInterfaceItem { Name = "wan", Device = "eth1", IpAddress = "DHCP/PPPoE", IsUp = true });
+            var devices = new Dictionary<string, NetworkInterfaceItem>(StringComparer.Ordinal);
+            NetworkInterfaceItem? current = null;
+            foreach (var line in ipOut.Split('\n'))
+            {
+                var ipLine = Regex.Match(line, @"^\d+:\s+([^\s:]+)(?::|\s)");
+                if (ipLine.Success)
+                {
+                    var name = ipLine.Groups[1].Value.Split('@')[0];
+                    if (!devices.TryGetValue(name, out var device))
+                    {
+                        device = new NetworkInterfaceItem { Name = name, Device = name };
+                        devices.Add(name, device);
+                    }
+                    var flags = Regex.Match(line, @"<([^>]+)>");
+                    if (flags.Success)
+                        device.IsUp = Array.Exists(flags.Groups[1].Value.Split(','), flag => flag == "UP");
+                    var address = Regex.Match(line, @"\binet\s+([\d.]+)/(\d+)");
+                    if (address.Success)
+                    {
+                        device.IpAddress = address.Groups[1].Value;
+                        device.Netmask = "/" + address.Groups[2].Value;
+                    }
+                    continue;
+                }
+
+                // BusyBox and net-tools ifconfig variants.
+                var header = Regex.Match(line, @"^([^\s:]+)(?::|\s)");
+                if (header.Success)
+                {
+                    var name = header.Groups[1].Value;
+                    if (!devices.TryGetValue(name, out current))
+                    {
+                        current = new NetworkInterfaceItem { Name = name, Device = name };
+                        devices.Add(name, current);
+                    }
+                }
+                if (current == null) continue;
+                if (Regex.IsMatch(line, @"\bUP\b")) current.IsUp = true;
+                var inet = Regex.Match(line, @"\binet\s+(?:addr:)?([\d.]+)");
+                if (inet.Success) current.IpAddress = inet.Groups[1].Value;
+                var mask = Regex.Match(line, @"(?:Mask:|netmask\s+)([\d.]+)");
+                if (mask.Success) current.Netmask = mask.Groups[1].Value;
+            }
+            list.AddRange(devices.Values);
         }
 
         return list;
@@ -334,7 +380,7 @@ echo '===SECTION:END==='
     public async Task<(bool Success, string Message)> RebootAsync()
     {
         var (code, _, err) = await _ssh.ExecuteCommandAsync("reboot", 5);
-        if (code == 0 || string.IsNullOrEmpty(err))
+        if (code == 0)
         {
             await _ssh.DisconnectAsync();
             return (true, "Команда на перезагрузку отправлена. Роутер перезагружается...");
@@ -360,7 +406,9 @@ echo '===SECTION:END==='
 
     public async Task<(bool Success, string Message)> FlushDnsCacheAsync()
     {
-        var (code, _, err) = await _ssh.ExecuteCommandAsync("/etc/init.d/dnsmasq reload", 10);
+        // SIGHUP clears dnsmasq's cache; OpenWrt's reload path can be a no-op
+        // when its configuration has not changed.
+        var (code, _, err) = await _ssh.ExecuteCommandAsync("killall -HUP dnsmasq", 10);
         return code == 0
             ? (true, "Кэш DNS успешно сброшен!")
             : (false, $"Ошибка сброса кэша DNS: {err}");
@@ -368,7 +416,9 @@ echo '===SECTION:END==='
 
     public async Task<(bool Success, string Message)> RestartServiceAsync(string serviceName)
     {
-        var cleanService = ShellHelper.SanitizeIdentifier(serviceName);
+        if (string.IsNullOrWhiteSpace(serviceName) || !Regex.IsMatch(serviceName, @"^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$"))
+            return (false, "Недопустимое имя службы");
+        var cleanService = serviceName;
         var (code, _, err) = await _ssh.ExecuteCommandAsync($"/etc/init.d/{cleanService} restart", 15);
         return code == 0
             ? (true, $"Служба {cleanService} успешно перезапущена!")

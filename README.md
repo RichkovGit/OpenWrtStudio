@@ -1,16 +1,16 @@
 <div align="center">
 
-# 🌐 OpenWrt Studio (WrtPilot) v2.5.0
+# 🌐 OpenWrt Studio (WrtPilot) v2.5.19
 
 **Современный центр управления, глубокой настройки, мониторинга и автоматического устранения неполадок для роутеров OpenWrt.**
 
-[![Release](https://img.shields.io/badge/release-v2.5.0-blue.svg?style=flat-square)](https://github.com/RichkovGit/OpenWrtStudio/releases)
+[![Release](https://img.shields.io/badge/release-v2.5.19-blue.svg?style=flat-square)](https://github.com/RichkovGit/OpenWrtStudio/releases/tag/v2.5.19)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011%20x64-0078D4.svg?style=flat-square)](https://github.com/RichkovGit/OpenWrtStudio/releases)
 [![Framework](https://img.shields.io/badge/.NET-8.0%20WPF-512BD4.svg?style=flat-square)](https://dotnet.microsoft.com/)
-[![OpenWrt](https://img.shields.io/badge/OpenWrt-21.02%20--%2025.x-2596be.svg?style=flat-square)](https://openwrt.org/)
+[![OpenWrt](https://img.shields.io/badge/OpenWrt-SSH-2596be.svg?style=flat-square)](https://openwrt.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
 
-[📥 Скачать установщик (.exe)](#-загрузка-и-установка) • [📦 Скачать Portable (.zip)](#-загрузка-и-установка) • [🚀 Возможности](#-ключевые-возможности) • [🛠️ Сборка из исходников](#-сборка-из-исходников)
+[📦 Скачать Portable (.zip)](#-загрузка-и-установка) • [📝 Изменения v2.5.19](RELEASE_NOTES.md) • [🚀 Возможности](#-ключевые-возможности) • [🛠️ Сборка из исходников](#-сборка-из-исходников)
 
 </div>
 
@@ -22,18 +22,16 @@
 
 Приложение позволяет настраивать Wi-Fi, интернет-соединения, правила брандмауэра, маршруты обхода блокировок, настраивать современные протоколы (AmneziaWG, Sing-box, Mihomo, WireGuard, Tailscale), внедрять подписки и автоматически восстанавливать доступ в интернет при сбоях.
 
+Доступность отдельных функций зависит от прошивки, архитектуры и установленных на роутере пакетов. Для работы нужны доступ по SSH и права на соответствующие настройки.
+
 ---
 
 
 ## 📸 Скриншоты десктопного интерфейса
 
-| Дашборд и ресурсы | Управление клиентами | Настройки и профили |
-| :---: | :---: | :---: |
-| <img src="screenshots/01_dashboard.png" width="280"/> | <img src="screenshots/02_clients.png" width="280"/> | <img src="screenshots/03_settings.png" width="280"/> |
+![Обзор сети OpenWrt Studio v2.5.19](screenshots/dashboard-v2.5.19.png)
 
-| Управление Wi-Fi и сетью | VPN Протоколы и Карта возможностей |
-| :---: | :---: |
-| <img src="screenshots/04_wifi_network.png" width="380"/> | <img src="screenshots/05_vpn_matrix.png" width="380"/> |
+В v2.5.19 добавлены стартовый экран подключения, время последнего снимка и сохранение текстового отчёта без профилей, IP/MAC-адресов, паролей и ключей. Горячие клавиши: `Ctrl+1` — обзор, `Ctrl+2` — клиенты, `Ctrl+3` — диагностика, `Ctrl+,` — настройки. Полный список исправлений — в [заметках о выпуске](RELEASE_NOTES.md).
 
 ---
 
@@ -51,7 +49,7 @@
   * При закрытии окна крестиком «X» приложение сворачивается в трей и продолжает мониторить роутер.
 
 ### 2. 🌐 Конструктор Mihomo (Clash.Meta) + Внедрение подписок
-* **Вкладка «Подписки»**: вставка ссылок на подписки любого провайдера (VLESS, Shadowsocks, Clash.Meta).
+* **Вкладка «Подписки»**: вставка ссылок на подписки в совместимом с Mihomo формате.
 * **Инжекция в конфигуратор**: автоматическое создание блоков `proxy-providers` и привязка к группам прокси (`use: [имя-подписки]`).
 * **Прямое обновление на роутере**: скачивание свежих узлов через `curl/wget` прямо в `/etc/mihomo/proxy_providers/` и перезагрузка службы без перезагрузки всей системы.
 * **Готовые пресеты в 1 клик**:
@@ -71,12 +69,13 @@
 * Интерактивная матрица статуса для 9 протоколов: **AmneziaWG, WireGuard, Sing-box, Mihomo, PassWall, OpenVPN, Tailscale, ZeroTier, Xray**.
 * Статусы: `Активен и работает`, `Установлен, но выключен`, `Не установлен` (с кнопкой быстрой установки).
 
-### 5. 🛡️ Полные конфигураторы всех VPN протоколов
-* **Amnezia WireGuard (AWG)**: импорт файлов `.conf` с поддержкой всех параметров обфускации:
+### 5. 🛡️ Конфигураторы VPN-протоколов
+* **Amnezia WireGuard (AWG)**: импорт файлов `.conf` с поддержкой параметров обфускации:
   * Мусорные пакеты: **`Jc`**, **`Jmin`**, **`Jmax`**
   * Сдвиг заголовков рукопожатия: **`S1`**, **`S2`**
   * Магические заголовки: **`H1`**, **`H2`**, **`H3`**, **`H4`**
   * Генерация UCI для `/etc/config/network` и активация интерфейса `awg0`.
+  * В v2.5.19 исправлены IPv6 endpoint, применение DNS и проверка имени интерфейса.
 * **WireGuard**: классический конфигуратор ключей, эндпоинтов и маршрутов.
 * **Sing-box**: конфигуратор VLESS Reality / Hysteria 2 / TUIC с генерацией `config.json` и TUN-режимом.
 * **OpenVPN**: импорт `.ovpn` профилей и автонастройка клиента.
@@ -87,14 +86,14 @@
 * **LAN и DHCP**: смените IP-адрес роутера, маску подсети, диапазон пула DHCP, а также добавляйте статические IP по MAC-адресам (Static Leases).
 * **WAN (Интернет)**: настройка PPPoE (логин/пароль, MTU 1492), DHCP-клиента или Статического IP с указанием шлюза и DNS.
 * **Брандмауэр (Проброс портов)**: добавление правил Port Forwarding (внешний порт -> внутренний IP:порт) для веб-серверов, игр и torrent-клиентов с мгновенным применением.
-* **Система и администрирование**: смените Hostname, часовой пояс, NTP-серверы, безопасно смените пароль учетной записи `root`, а также скачайте полный бэкап архива настроек `sysupgrade.tgz`.
+* **Система и администрирование**: смените Hostname, часовой пояс и пароль учётной записи `root`, а также скачайте архив настроек, созданный `sysupgrade -b`.
 
 ### 7. ⏰ Планировщик задач (Cron)
 * **Шаблоны в 1 клик**:
   * 🌙 Ночная перезагрузка (04:00).
   * 📴 Отключение Wi-Fi на ночь (01:00-07:00).
   * 🔄 Автообновление подписок каждые 6 часов.
-  * 🧹 Очистка кэша RAM (`drop_caches`) каждые 30 минут.
+  * 🧹 Ночная очистка кэша RAM (`drop_caches`, 03:00).
   * 📡 Ping Watchdog (проверка доступности внешнего узла каждые 5 мин и рестарт сети при обрыве).
 * **Конструктор произвольных задач**: ввод любого расписания, включение/отключение задач галочкой и кнопка **«Выполнить сейчас»**.
 
@@ -105,31 +104,32 @@
 * 5 методов автоматического решения проблем в один клик.
 
 ### 9. 🎨 Темы оформления LuCI и Каталог пакетов
-* Установка и смена тем интерфейса роутера в 1 клик: **Argon** (+ конфигуратор фонов и логотипов), **Design**, **Edge**, **Material**.
+* Установка тем интерфейса роутера: **Argon** (+ конфигуратор фонов и логотипов), **Edge**, **Material**, **OpenWrt 2020**. Совместимость зависит от версии LuCI; установка устаревшей темы Design блокируется.
 * Полнотекстовый поиск по официальным репозиториям OpenWrt и сторонним источникам.
 
 ---
 
 ## 📥 Загрузка и установка
 
-В разделе [**GitHub Releases**](https://github.com/RichkovGit/OpenWrtStudio/releases/latest) доступны два варианта:
+В [релизе **v2.5.19**](https://github.com/RichkovGit/OpenWrtStudio/releases/tag/v2.5.19) используется портативная автономная сборка для Windows 10/11 x64.
 
-### Вариант 1: Установщик (Рекомендуется)
-* Скачайте файл **`OpenWrtStudio_Setup_v2.5.exe`** (~73 МБ).
-* Запустите установку. Мастер автоматически создаст ярлыки на Рабочем столе, в меню «Пуск» и настроит автозапуск в системном трее при старте Windows.
+1. Скачайте **`OpenWrtStudio_v2.5.19_Portable.zip`** и **`SHA256SUMS.txt`** из одного релиза.
+2. Проверьте контрольную сумму архива.
+3. Закройте ранее запущенную копию, распакуйте архив в новую папку и запустите `OpenWrtStudio.exe`.
 
-### Вариант 2: Портативная версия
-* Скачайте архив **`OpenWrtStudio_v2.5_Portable.zip`** (~72 МБ).
-* Распакуйте в любую удобную папку (или на флешку) и запускайте `OpenWrtStudio.exe`. Программа не требует установки .NET SDK.
+Отдельная установка .NET SDK или Runtime не требуется. Профили и настройки по умолчанию хранятся в `%APPDATA%\OpenWrtStudio`. Установщик для v2.5.19 не выпускается; скачанный через встроенную проверку обновлений ZIP нужно распаковать вручную.
 
 ---
 
 ## 🔒 Контрольные суммы (SHA-256)
 
-```text
-057b2b4e220a2f7ed6730080a0279045ba05deb766c4cdede48778714600721d  OpenWrtStudio_Setup_v2.5.exe
-a9c7ebe4f54916adfc0d5ba968dbbdf4ae3b8aea5a719d17dacbf4177e7cc6ed  OpenWrtStudio_v2.5_Portable.zip
+Контрольные суммы относятся к конкретному архиву и опубликованы в файле `SHA256SUMS.txt` рядом с ним. Получить SHA-256 в PowerShell:
+
+```powershell
+Get-FileHash -LiteralPath .\OpenWrtStudio_v2.5.19_Portable.zip -Algorithm SHA256
 ```
+
+Сравните поле `Hash` со строкой соответствующего архива в `SHA256SUMS.txt`.
 
 ---
 
@@ -138,7 +138,6 @@ a9c7ebe4f54916adfc0d5ba968dbbdf4ae3b8aea5a719d17dacbf4177e7cc6ed  OpenWrtStudio_
 ### Требования:
 * ОС: Windows 10/11 x64
 * [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-* [Inno Setup 6](https://jrsoftware.org/isinfo.php) (только для сборки инсталлятора)
 
 ### Инструкция по сборке:
 
@@ -150,19 +149,24 @@ a9c7ebe4f54916adfc0d5ba968dbbdf4ae3b8aea5a719d17dacbf4177e7cc6ed  OpenWrtStudio_
 
 2. **Запуск автоматических тестов**:
    ```powershell
-   dotnet test OpenWrtStudio.Tests/OpenWrtStudio.Tests.csproj
+   dotnet test ./OpenWrtStudio.Tests/OpenWrtStudio.Tests.csproj -c Release
    ```
 
 3. **Сборка автономного Single-File EXE**:
    ```powershell
-   dotnet publish OpenWrtStudio/OpenWrtStudio.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o OpenWrtStudio/publish
+   dotnet publish ./OpenWrtStudio.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ./publish
    ```
 
-4. **Сборка инсталлятора Setup.exe**:
+4. **Создание Portable ZIP**:
    ```powershell
-   & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" OpenWrtStudio/installer/setup.iss
+   Compress-Archive -Path ./publish/* -DestinationPath ./OpenWrtStudio_v2.5.19_Portable.zip
    ```
-   Готовый файл будет создан в папке `installer_output/OpenWrtStudio_Setup_v2.5.exe`.
+
+Команды выполняются из корня репозитория: `OpenWrtStudio.csproj` расположен в корне, проект тестов — в `OpenWrtStudio.Tests`.
+
+Для v2.5.19 прошли **124 теста без подключения к роутеру**, ещё 5 интеграционных проверок в обычном запуске отключены. Отдельно прошли **2 проверки чтения реального роутера**. Это проверка выбранных сценариев, а не всех сочетаний прошивок и оборудования.
+
+Workflow [Desktop build and tests](.github/workflows/desktop.yml) запускает тесты на `windows-latest` с .NET 8 и сохраняет Portable ZIP, SHA-256 и результаты тестов как артефакты Actions. Данные доступа к роутеру и включение live-проверок для CI не нужны.
 
 ---
 

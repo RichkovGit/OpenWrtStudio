@@ -132,7 +132,7 @@
 
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                             <ui:ToggleSwitch Content="Тёмная тема" IsChecked="{Binding IsDarkMode}" 
-                                             Command="{Binding ToggleThemeCommand}" Margin="0,0,12,0" />
+                                             Margin="0,0,12,0" />
                             <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon DarkTheme24}" 
                                        Content="Сменить режим" Command="{Binding ToggleThemeCommand}" />
                         </StackPanel>

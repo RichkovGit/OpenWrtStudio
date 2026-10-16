@@ -1,0 +1,79 @@
+name: Desktop build and tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET 8
+        id: dotnet
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Select installed .NET 8 SDK
+        env:
+          DESKTOP_DOTNET_SDK: ${{ steps.dotnet.outputs.dotnet-version }}
+        run: |
+          @{ sdk = @{ version = $env:DESKTOP_DOTNET_SDK; rollForward = 'latestPatch' } } |
+            ConvertTo-Json -Depth 3 |
+            Set-Content -LiteralPath ./global.json -Encoding utf8NoBOM
+
+      - name: Restore tests and application
+        run: dotnet restore ./OpenWrtStudio.Tests/OpenWrtStudio.Tests.csproj
+
+      # Live router and GitHub integration tests are opt-in; no credentials are supplied.
+      - name: Run offline tests
+        run: dotnet test ./OpenWrtStudio.Tests/OpenWrtStudio.Tests.csproj --configuration Release --no-restore --logger trx --results-directory ./TestResults
+
+      - name: Publish portable application
+        run: dotnet publish ./OpenWrtStudio.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output ./publish
+
+      - name: Package portable archive and checksum
+        run: |
+          $project = [xml](Get-Content -LiteralPath ./OpenWrtStudio.csproj -Raw)
+          $releaseVersion = [string]$project.Project.PropertyGroup.Version
+          New-Item -ItemType Directory -Path ./artifacts -Force | Out-Null
+          $archiveName = "OpenWrtStudio_v${releaseVersion}_Portable.zip"
+          $archivePath = Join-Path ./artifacts $archiveName
+          Compress-Archive -Path ./publish/* -DestinationPath $archivePath
+          $archiveHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$archiveHash  $archiveName" | Set-Content -LiteralPath ./artifacts/SHA256SUMS.txt -Encoding ascii
+
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: OpenWrtStudio-win-x64-portable
+          path: |
+            artifacts/*_Portable.zip
+            artifacts/SHA256SUMS.txt
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-test-results
+          path: TestResults/**/*.trx
+          if-no-files-found: warn

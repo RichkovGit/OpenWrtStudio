@@ -6,7 +6,7 @@
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:views="clr-namespace:OpenWrtStudio.Views"
         mc:Ignorable="d"
-        Title="OpenWrt Studio" Height="820" Width="1240"
+        Title="OpenWrt Studio" Height="860" Width="1320"
         MinHeight="680" MinWidth="1020"
         WindowStartupLocation="CenterScreen"
         WindowBackdropType="None"
@@ -14,6 +14,12 @@
         Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
         Foreground="{DynamicResource TextFillColorPrimaryBrush}">
 
+    <ui:FluentWindow.InputBindings>
+        <KeyBinding Gesture="Ctrl+1" Command="{Binding NavigateToCommand}" CommandParameter="Dashboard" />
+        <KeyBinding Gesture="Ctrl+2" Command="{Binding NavigateToCommand}" CommandParameter="Clients" />
+        <KeyBinding Gesture="Ctrl+3" Command="{Binding NavigateToCommand}" CommandParameter="Diagnostics" />
+        <KeyBinding Gesture="Ctrl+OemComma" Command="{Binding NavigateToCommand}" CommandParameter="Settings" />
+    </ui:FluentWindow.InputBindings>
     <ui:FluentWindow.Resources>
         <!-- Fluent Navigation Sidebar RadioButton Style -->
         <Style x:Key="SidebarNavRadioButtonStyle" TargetType="RadioButton">
@@ -63,7 +69,7 @@
         </Grid.RowDefinitions>
 
         <!-- TitleBar -->
-        <ui:TitleBar Grid.Row="0" Title="OpenWrt Studio - Центр управления, Диагностика и Конструктор Mihomo"
+        <ui:TitleBar Grid.Row="0" Title="OpenWrt Studio · Центр управления сетью"
                      Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
                      Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
 
@@ -87,7 +93,7 @@
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="14,0,0,0">
                     <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Link24}" Content="Подключить" 
                                Command="{Binding ConnectCommand}" Margin="0,0,6,0"
-                               Visibility="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" />
+                               Visibility="{Binding IsConnected, Converter={StaticResource InverseBooleanToVisibilityConverter}}" />
                     <ui:Button Appearance="Danger" Icon="{ui:SymbolIcon LinkDismiss24}" Content="Отключить" 
                                Command="{Binding DisconnectCommand}" Margin="0,0,6,0"
                                Visibility="{Binding IsConnected, Converter={StaticResource BooleanToVisibilityConverter}}" />
@@ -191,11 +197,16 @@
                     BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,1,0">
                 <Grid Margin="10,16,10,10">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <StackPanel>
+                    <StackPanel Margin="14,6,0,22">
+                        <TextBlock Text="OPENWRT STUDIO" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                        <TextBlock Text="Ваша сеть под контролем" Margin="0,5,0,0" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1">
                         <!-- 0: Дашборд -->
                         <RadioButton x:Name="NavDashboard" Style="{StaticResource SidebarNavRadioButtonStyle}"
                                      IsChecked="{Binding SelectedNavIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0, Mode=TwoWay}">
@@ -296,7 +307,7 @@
                     </StackPanel>
 
                     <!-- Footer: 10: Settings item -->
-                    <RadioButton Grid.Row="1" x:Name="NavSettings" Style="{StaticResource SidebarNavRadioButtonStyle}"
+                    <RadioButton Grid.Row="2" x:Name="NavSettings" Style="{StaticResource SidebarNavRadioButtonStyle}"
                                  IsChecked="{Binding SelectedNavIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=10, Mode=TwoWay}">
                         <StackPanel Orientation="Horizontal">
                             <ui:SymbolIcon Symbol="Settings24" FontSize="18" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" Margin="0,0,10,0" />

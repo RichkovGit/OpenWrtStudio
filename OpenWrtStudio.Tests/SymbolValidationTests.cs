@@ -66,7 +66,7 @@ public class SymbolValidationTests
     [Fact]
     public void ValidateAllXamlSymbolsAgainstEnum()
     {
-        var xamlDir = @"C:\Users\danny\.gemini\antigravity\scratch\OpenWrtStudio";
+        var xamlDir = TestPaths.RepositoryRoot;
         var xamlFiles = System.IO.Directory.GetFiles(xamlDir, "*.xaml", System.IO.SearchOption.AllDirectories);
         var invalid = new System.Collections.Generic.List<string>();
         var pattern = new System.Text.RegularExpressions.Regex(@"(?:Symbol=""|\{ui:SymbolIcon\s+)([A-Za-z0-9_]+)");
@@ -116,15 +116,16 @@ public class SymbolValidationTests
         thread.Join();
     }
 
-    [Fact]
+    [LiveRouterFact]
+    [Trait("Category", "Integration")]
     public async Task TestLiveRouterInfoFetch()
     {
         var profile = new OpenWrtStudio.Models.ConnectionProfile
         {
-            Host = "192.168.10.1",
-            Port = 22,
-            Username = "root",
-            Password = "danik05092005"
+            Host = Environment.GetEnvironmentVariable("OPENWRT_TEST_HOST")!,
+            Port = int.TryParse(Environment.GetEnvironmentVariable("OPENWRT_TEST_PORT"), out var port) ? port : 22,
+            Username = Environment.GetEnvironmentVariable("OPENWRT_TEST_USER") ?? "root",
+            Password = Environment.GetEnvironmentVariable("OPENWRT_TEST_PASSWORD")!
         };
 
         var ssh = new OpenWrtStudio.Services.SshService();
@@ -137,11 +138,9 @@ public class SymbolValidationTests
 
         await ssh.DisconnectAsync();
 
-        Assert.Equal("Cudy WR3000S v1 (OpenWrt U-Boot layout)", info.Model);
-        Assert.Equal("OpenWrt", info.Hostname);
-        Assert.Contains("25.12.5", info.OpenWrtRelease);
-        Assert.Equal("6.12.94", info.KernelRelease);
-        Assert.Equal("aarch64_cortex-a53", info.Architecture);
+        Assert.NotEmpty(info.Model);
+        Assert.NotEmpty(info.OpenWrtRelease);
+        Assert.NotEmpty(info.KernelRelease);
         Assert.True(info.UptimeSeconds > 0);
         Assert.True(info.RamTotalKB > 0);
         Assert.True(info.RamUsagePercent > 0);

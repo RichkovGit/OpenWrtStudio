@@ -13,7 +13,7 @@ public interface IBackgroundMonitorService
     event Action<RouterInfo?>? OnRouterStatePolled;
 }
 
-public class BackgroundMonitorService : IBackgroundMonitorService
+public class BackgroundMonitorService : IBackgroundMonitorService, IDisposable
 {
     private readonly ISshService _ssh;
     private readonly IRouterService _routerService;
@@ -21,10 +21,16 @@ public class BackgroundMonitorService : IBackgroundMonitorService
     private readonly INotificationService _notifications;
 
     private CancellationTokenSource? _cts;
+    private readonly object _lifecycleLock = new();
+    private readonly SemaphoreSlim _pollLock = new(1, 1);
+    private bool _disposed;
     private bool _lastKnownConnected = false;
     private bool _hasInitializedState = false;
 
-    public bool IsRunning => _cts != null && !_cts.IsCancellationRequested;
+    public bool IsRunning
+    {
+        get { lock (_lifecycleLock) return _cts != null && !_cts.IsCancellationRequested; }
+    }
     public event Action<RouterInfo?>? OnRouterStatePolled;
 
     public BackgroundMonitorService(
@@ -44,7 +50,7 @@ public class BackgroundMonitorService : IBackgroundMonitorService
 
     private void OnSentinelIssueChanged(object? sender, SentinelIssue? issue)
     {
-        if (issue == null) return;
+        if (issue == null || !IsRunning) return;
 
         var severity = issue.Severity switch
         {
@@ -64,44 +70,68 @@ public class BackgroundMonitorService : IBackgroundMonitorService
 
     public void StartMonitoring(int intervalSeconds = 25)
     {
-        if (IsRunning) return;
+        if (intervalSeconds <= 0) throw new ArgumentOutOfRangeException(nameof(intervalSeconds));
+        lock (_lifecycleLock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_cts != null) return;
+            _hasInitializedState = false;
+            _cts = new CancellationTokenSource();
+            var source = _cts;
+            _ = Task.Run(() => RunMonitoringAsync(source, intervalSeconds));
+        }
+    }
 
-        _cts = new CancellationTokenSource();
-        var token = _cts.Token;
-
-        Task.Run(async () =>
+    private async Task RunMonitoringAsync(CancellationTokenSource source, int intervalSeconds)
+    {
+        var token = source.Token;
+        try
         {
             while (!token.IsCancellationRequested)
             {
+                await _pollLock.WaitAsync(token);
                 try
                 {
-                    await CheckRouterHealthAsync();
+                    token.ThrowIfCancellationRequested();
+                    await CheckRouterHealthAsync(token);
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                {
+                    break;
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"[BackgroundMonitor] Error during poll: {ex.Message}");
                 }
-
-                try
+                finally
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(intervalSeconds), token);
+                    _pollLock.Release();
                 }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
+                await Task.Delay(TimeSpan.FromSeconds(intervalSeconds), token);
             }
-        }, token);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        finally
+        {
+            lock (_lifecycleLock)
+            {
+                if (ReferenceEquals(_cts, source)) _cts = null;
+                source.Dispose();
+            }
+        }
     }
 
     public void StopMonitoring()
     {
-        _cts?.Cancel();
-        _cts?.Dispose();
-        _cts = null;
+        lock (_lifecycleLock)
+        {
+            _cts?.Cancel();
+            // The worker owns disposal; it may still be finishing an SSH poll.
+            _cts = null;
+        }
     }
 
-    private async Task CheckRouterHealthAsync()
+    private async Task CheckRouterHealthAsync(CancellationToken token)
     {
         bool isConnected = _ssh.IsConnected;
 
@@ -109,7 +139,6 @@ public class BackgroundMonitorService : IBackgroundMonitorService
         {
             _lastKnownConnected = isConnected;
             _hasInitializedState = true;
-            return;
         }
 
         // 1. Connection state transition checks
@@ -134,12 +163,17 @@ public class BackgroundMonitorService : IBackgroundMonitorService
 
         _lastKnownConnected = isConnected;
 
-        if (!isConnected) return;
+        if (!isConnected)
+        {
+            OnRouterStatePolled?.Invoke(null);
+            return;
+        }
 
         // 2. Poll Router Stats (RAM, CPU, Overlay)
         try
         {
             var info = await _routerService.GetRouterInfoAsync();
+            token.ThrowIfCancellationRequested();
             OnRouterStatePolled?.Invoke(info);
 
             if (info != null)
@@ -165,6 +199,7 @@ public class BackgroundMonitorService : IBackgroundMonitorService
                 }
             }
         }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
         catch
         {
             // Transient SSH error
@@ -173,11 +208,23 @@ public class BackgroundMonitorService : IBackgroundMonitorService
         // 3. Sentinel Quick Probe
         try
         {
-            await _sentinel.ProbeHealthAsync();
+            token.ThrowIfCancellationRequested();
+            if (_sentinel.IsMonitoring) await _sentinel.ProbeHealthAsync();
         }
         catch
         {
             // Transient probe error
+        }
+    }
+
+    public void Dispose()
+    {
+        lock (_lifecycleLock)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            StopMonitoring();
+            _sentinel.IssueChanged -= OnSentinelIssueChanged;
         }
     }
 }

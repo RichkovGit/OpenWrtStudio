@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using Hardcodet.Wpf.TaskbarNotification;
@@ -32,6 +33,9 @@ public class SystemTrayManager : ISystemTrayManager, IDisposable
 
     public void Initialize(Window mainWindow)
     {
+        Dispose();
+        _isExplicitExit = false;
+        _hasShownMinimizeNotice = false;
         _mainWindow = mainWindow;
 
         _taskbarIcon = new TaskbarIcon();
@@ -72,22 +76,14 @@ public class SystemTrayManager : ISystemTrayManager, IDisposable
         var itemRestartNet = new MenuItem { Header = "🔄 Перезапустить сеть" };
         itemRestartNet.Click += async (s, e) =>
         {
-            if (_ssh.IsConnected)
-            {
-                await _ssh.ExecuteCommandAsync("/etc/init.d/network restart", 10);
-                _notifications.ShowNotification("Сеть роутера", "Команда перезапуска сети отправлена на роутер.", NotificationSeverity.Info);
-            }
+            await RunRouterActionAsync(itemRestartNet, "/etc/init.d/network restart", "Сеть роутера", "Сеть роутера перезапущена.");
         };
         contextMenu.Items.Add(itemRestartNet);
 
         var itemFlushDns = new MenuItem { Header = "🌐 Очистить кэш DNS" };
         itemFlushDns.Click += async (s, e) =>
         {
-            if (_ssh.IsConnected)
-            {
-                await _ssh.ExecuteCommandAsync("/etc/init.d/dnsmasq restart", 10);
-                _notifications.ShowNotification("DNS роутера", "Кэш DNS очищен, служба dnsmasq перезапущена.", NotificationSeverity.Info);
-            }
+            await RunRouterActionAsync(itemFlushDns, "killall -HUP dnsmasq", "DNS роутера", "Кэш DNS очищен.");
         };
         contextMenu.Items.Add(itemFlushDns);
 
@@ -114,24 +110,43 @@ public class SystemTrayManager : ISystemTrayManager, IDisposable
         _taskbarIcon.TrayLeftMouseDown += (s, e) => RestoreMainWindow();
 
         // Listen for notification dispatches
-        _notifications.OnNotificationRequested += (title, message, severity) =>
-        {
-            Application.Current.Dispatcher.Invoke(() =>
-            {
-                var iconType = severity switch
-                {
-                    NotificationSeverity.Critical => BalloonIcon.Error,
-                    NotificationSeverity.Warning => BalloonIcon.Warning,
-                    _ => BalloonIcon.Info
-                };
-
-                _taskbarIcon?.ShowBalloonTip(title, message, iconType);
-            });
-        };
+        _notifications.OnNotificationRequested += OnNotificationRequested;
 
         // Window closing behavior: minimize to tray instead of quitting
         _mainWindow.Closing += OnMainWindowClosing;
         _mainWindow.StateChanged += OnMainWindowStateChanged;
+    }
+
+    private async Task RunRouterActionAsync(MenuItem item, string command, string title, string successMessage)
+    {
+        if (!_ssh.IsConnected)
+        {
+            _notifications.ShowNotification(title, "Сначала подключитесь к роутеру.", NotificationSeverity.Warning);
+            return;
+        }
+        item.IsEnabled = false;
+        try
+        {
+            var result = await _ssh.ExecuteCommandAsync(command, 15);
+            _notifications.ShowNotification(title, result.ExitCode == 0 ? successMessage : $"Команда не выполнена: {result.Error}",
+                result.ExitCode == 0 ? NotificationSeverity.Success : NotificationSeverity.Warning);
+        }
+        catch (Exception ex)
+        {
+            _notifications.ShowNotification(title, $"Команда не выполнена: {ex.Message}", NotificationSeverity.Warning);
+        }
+        finally { item.IsEnabled = true; }
+    }
+
+    private void OnNotificationRequested(string title, string message, NotificationSeverity severity)
+    {
+        var iconType = severity switch
+        {
+            NotificationSeverity.Critical => BalloonIcon.Error,
+            NotificationSeverity.Warning => BalloonIcon.Warning,
+            _ => BalloonIcon.Info
+        };
+        ShowBalloonTip(title, message, iconType);
     }
 
     public void UpdateStatusText(string status)
@@ -139,9 +154,9 @@ public class SystemTrayManager : ISystemTrayManager, IDisposable
         if (_taskbarIcon == null) return;
         var text = $"OpenWrt Studio: {status}";
         if (text.Length > 63) text = text.Substring(0, 60) + "...";
-        Application.Current.Dispatcher.Invoke(() =>
+        Application.Current?.Dispatcher.Invoke(() =>
         {
-            _taskbarIcon.ToolTipText = text;
+            if (_taskbarIcon != null) _taskbarIcon.ToolTipText = text;
         });
     }
 
@@ -195,6 +210,13 @@ public class SystemTrayManager : ISystemTrayManager, IDisposable
 
     public void Dispose()
     {
+        _notifications.OnNotificationRequested -= OnNotificationRequested;
+        if (_mainWindow != null)
+        {
+            _mainWindow.Closing -= OnMainWindowClosing;
+            _mainWindow.StateChanged -= OnMainWindowStateChanged;
+            _mainWindow = null;
+        }
         if (_taskbarIcon != null)
         {
             _taskbarIcon.Visibility = Visibility.Collapsed;
