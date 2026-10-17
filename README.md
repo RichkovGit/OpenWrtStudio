@@ -10,7 +10,7 @@
 [![OpenWrt](https://img.shields.io/badge/OpenWrt-SSH-2596be.svg?style=flat-square)](https://openwrt.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
 
-[📦 Скачать Portable (.zip)](#-загрузка-и-установка) • [📝 Изменения v2.5.19](RELEASE_NOTES.md) • [🚀 Возможности](#-ключевые-возможности) • [🛠️ Сборка из исходников](#-сборка-из-исходников)
+[📥 Установщик и Portable](#-загрузка-и-установка) • [📝 Изменения v2.5.19](RELEASE_NOTES.md) • [🚀 Возможности](#-ключевые-возможности) • [🛠️ Сборка из исходников](#-сборка-из-исходников)
 
 </div>
 
@@ -111,25 +111,27 @@
 
 ## 📥 Загрузка и установка
 
-В [релизе **v2.5.19**](https://github.com/RichkovGit/OpenWrtStudio/releases/tag/v2.5.19) используется портативная автономная сборка для Windows 10/11 x64.
+В [релизе **v2.5.19**](https://github.com/RichkovGit/OpenWrtStudio/releases/tag/v2.5.19) используются автономные сборки для Windows 10/11 x64:
 
-1. Скачайте **`OpenWrtStudio_v2.5.19_Portable.zip`** и **`SHA256SUMS.txt`** из одного релиза.
-2. Проверьте контрольную сумму архива.
-3. Закройте ранее запущенную копию, распакуйте архив в новую папку и запустите `OpenWrtStudio.exe`.
+- **`OpenWrtStudio_Setup_v2.5.19.exe`** — установка для текущего пользователя в `%LOCALAPPDATA%\Programs\OpenWrt Studio`. Установщик предлагает ярлык рабочего стола и автозапуск в трее; оба пункта включаются по желанию.
+- **`OpenWrtStudio_v2.5.19_Portable.zip`** — распаковка в выбранную папку и запуск `OpenWrtStudio.exe`.
 
-Отдельная установка .NET SDK или Runtime не требуется. Профили и настройки по умолчанию хранятся в `%APPDATA%\OpenWrtStudio`. Установщик для v2.5.19 не выпускается; скачанный через встроенную проверку обновлений ZIP нужно распаковать вручную.
+Скачайте нужный файл и `SHA256SUMS.txt` из одного релиза, проверьте SHA-256 и завершите прежнюю копию приложения через меню трея «Выход» перед заменой. Закрытие окна крестиком оставляет приложение работающим в трее.
+
+Отдельная установка .NET SDK или Runtime не требуется. Профили и настройки по умолчанию хранятся в `%APPDATA%\OpenWrtStudio`; установщик и его удаление не очищают эту папку. Скачанный через встроенную проверку обновлений ZIP нужно распаковать вручную.
 
 ---
 
 ## 🔒 Контрольные суммы (SHA-256)
 
-Контрольные суммы относятся к конкретному архиву и опубликованы в файле `SHA256SUMS.txt` рядом с ним. Получить SHA-256 в PowerShell:
+Контрольные суммы относятся к конкретному файлу и опубликованы в `SHA256SUMS.txt` рядом с файлами выпуска. Получить SHA-256 в PowerShell:
 
 ```powershell
 Get-FileHash -LiteralPath .\OpenWrtStudio_v2.5.19_Portable.zip -Algorithm SHA256
+Get-FileHash -LiteralPath .\OpenWrtStudio_Setup_v2.5.19.exe -Algorithm SHA256
 ```
 
-Сравните поле `Hash` со строкой соответствующего архива в `SHA256SUMS.txt`.
+Сравните поле `Hash` со строкой соответствующего файла в `SHA256SUMS.txt`.
 
 ---
 
@@ -138,6 +140,7 @@ Get-FileHash -LiteralPath .\OpenWrtStudio_v2.5.19_Portable.zip -Algorithm SHA256
 ### Требования:
 * ОС: Windows 10/11 x64
 * [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+* [Inno Setup 6](https://jrsoftware.org/isinfo.php) — для сборки установщика; Portable можно собрать без него.
 
 ### Инструкция по сборке:
 
@@ -164,9 +167,15 @@ Get-FileHash -LiteralPath .\OpenWrtStudio_v2.5.19_Portable.zip -Algorithm SHA256
 
 Команды выполняются из корня репозитория: `OpenWrtStudio.csproj` расположен в корне, проект тестов — в `OpenWrtStudio.Tests`.
 
+5. **Сборка установщика существующим компилятором Inno Setup 6**:
+   ```powershell
+   ./scripts/build-installer.ps1
+   ```
+   Скрипт проверяет версию EXE, добавляет значок, лицензию и заметки о выпуске из репозитория и создаёт `installer_output/OpenWrtStudio_Setup_v2.5.19.exe`. Если компилятор находится вне стандартных папок, задайте `-CompilerPath 'C:\путь\ISCC.exe'`. Параметры `-PublishDirectory` и `-OutputDirectory` позволяют выбрать папки сборки. Скрипт не устанавливает инструменты автоматически. Источник установщика — [installer/setup.iss](installer/setup.iss).
+
 Для v2.5.19 прошли **124 теста без подключения к роутеру**, ещё 5 интеграционных проверок в обычном запуске отключены. Отдельно прошли **2 проверки чтения реального роутера**. Это проверка выбранных сценариев, а не всех сочетаний прошивок и оборудования.
 
-Workflow [Desktop build and tests](.github/workflows/desktop.yml) запускает тесты на `windows-latest` с .NET 8 и сохраняет Portable ZIP, SHA-256 и результаты тестов как артефакты Actions. Данные доступа к роутеру и включение live-проверок для CI не нужны.
+Workflow [Desktop build and tests](.github/workflows/desktop.yml) запускает тесты на `windows-latest` с .NET 8 и сохраняет Portable ZIP, установщик, SHA-256 и результаты тестов как артефакты Actions. Сборка установщика требует установленного Inno Setup 6 на runner. Данные доступа к роутеру и включение live-проверок для CI не нужны.
 
 ---
 

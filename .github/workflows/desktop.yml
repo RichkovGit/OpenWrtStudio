@@ -49,6 +49,9 @@ jobs:
       - name: Publish portable application
         run: dotnet publish ./OpenWrtStudio.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output ./publish
 
+      - name: Build Windows installer with the installed Inno Setup compiler
+        run: ./scripts/build-installer.ps1 -OutputDirectory ./artifacts
+
       - name: Package portable archive and checksum
         run: |
           $project = [xml](Get-Content -LiteralPath ./OpenWrtStudio.csproj -Raw)
@@ -57,15 +60,19 @@ jobs:
           $archiveName = "OpenWrtStudio_v${releaseVersion}_Portable.zip"
           $archivePath = Join-Path ./artifacts $archiveName
           Compress-Archive -Path ./publish/* -DestinationPath $archivePath
-          $archiveHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$archiveHash  $archiveName" | Set-Content -LiteralPath ./artifacts/SHA256SUMS.txt -Encoding ascii
+          Get-ChildItem -LiteralPath ./artifacts -File |
+            Where-Object { $_.Extension -in '.zip', '.exe' } |
+            Sort-Object Name |
+            ForEach-Object { "{0}  {1}" -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name } |
+            Set-Content -LiteralPath ./artifacts/SHA256SUMS.txt -Encoding ascii
 
-      - name: Upload portable artifact
+      - name: Upload Windows packages
         uses: actions/upload-artifact@v7
         with:
-          name: OpenWrtStudio-win-x64-portable
+          name: OpenWrtStudio-win-x64
           path: |
             artifacts/*_Portable.zip
+            artifacts/OpenWrtStudio_Setup_v*.exe
             artifacts/SHA256SUMS.txt
           compression-level: 0
           if-no-files-found: error
