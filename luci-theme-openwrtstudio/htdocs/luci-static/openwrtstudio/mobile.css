@@ -1,0 +1,2 @@
+@import url('/luci-static/bootstrap/mobile.css');
+@media(max-width:854px){body{padding:0 12px}.container{width:auto}header{margin:0 -12px}.studio-number{font-size:25px}}

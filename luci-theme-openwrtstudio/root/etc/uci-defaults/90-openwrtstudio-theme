@@ -1,0 +1,8 @@
+#!/bin/sh
+# Bootstrap templates preserve the upstream LuCI login, menus and form behavior.
+mkdir -p /usr/share/ucode/luci/template/themes/openwrtstudio
+cp /usr/share/ucode/luci/template/themes/bootstrap/header.ut /usr/share/ucode/luci/template/themes/openwrtstudio/header.ut
+cp /usr/share/ucode/luci/template/themes/bootstrap/footer.ut /usr/share/ucode/luci/template/themes/openwrtstudio/footer.ut
+uci -q set luci.themes.OpenWrtStudio=/luci-static/openwrtstudio
+uci commit luci
+exit 0

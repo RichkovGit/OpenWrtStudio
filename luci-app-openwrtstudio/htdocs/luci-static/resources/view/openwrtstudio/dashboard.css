@@ -1,0 +1,14 @@
+.studio-dashboard {color:#e4ebf5;font:15px/1.6 'Segoe UI',sans-serif}
+.studio-dashboard h2,.studio-dashboard h3 {color:#eff5ff!important}
+.studio-dashboard .studio-hero {background:linear-gradient(110deg,#233e62,#192332);border:1px solid #3b567b;padding:30px;border-radius:16px;margin-bottom:24px}
+.studio-dashboard .studio-eyebrow {color:#9ec4ff;letter-spacing:.14em;font-size:12px;font-weight:700}
+.studio-dashboard .studio-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin:20px 0}
+.studio-dashboard .studio-card {background:#192230;border:1px solid #354155;border-radius:13px;padding:22px}
+.studio-dashboard .studio-card h3 {margin:0 0 12px;font-size:16px}
+.studio-dashboard .studio-number {font-size:30px;font-weight:650;color:#d8e8ff}
+.studio-dashboard .studio-muted {color:#a6b6cc}
+.studio-dashboard .studio-link {display:block;padding:10px 0;border-bottom:1px solid #303b4c}
+.studio-dashboard a {color:#91baff}
+.studio-dashboard .studio-badge {display:inline-block;border-radius:20px;padding:3px 10px;background:#283e5c;color:#b3d2ff;font-size:12px}
+.studio-dashboard .table {color:#e4ebf5}
+@media(max-width:768px){.studio-dashboard .studio-hero{padding:20px}.studio-dashboard .studio-grid{grid-template-columns:1fr}}

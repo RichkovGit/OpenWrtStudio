@@ -1,0 +1,53 @@
+/* OpenWrt Studio. Native LuCI widgets and third-party applications remain usable. */
+@import url('/luci-static/bootstrap/cascade.css');
+:root, :root[data-darkmode="false"], :root[data-darkmode="true"] {
+ color-scheme: dark; --background-color:#10151e; --text-color:#e4ebf5;
+ --primary-color:#73a9ff; --border-color:#303b4c;
+ --background-color-delta-l-sign:1; --background-color-h:216; --background-color-s:30%; --background-color-l:10%;
+ --text-color-delta-l-sign:-1; --text-color-h:216; --text-color-s:35%; --text-color-l:96%;
+ --border-color-delta-l-sign:1; --primary-color-high:#91baff; --primary-color-medium:#73a9ff; --primary-color-low:#588ad0;
+ --on-primary-color:#10151e; --disabled-opacity:.55;
+}
+body { background:#10151e!important; color:#e4ebf5!important; font:15px/1.6 'Segoe UI',sans-serif; }
+header { background:#171e2a!important; border-bottom:1px solid #303b4c; box-shadow:0 4px 24px #0003; }
+header .brand { color:#91baff!important; font-weight:700; letter-spacing:.02em; }
+header .brand:before { content:'◈ Studio / '; color:#91baff; }
+header a, .nav>li>a { color:#dbe6fa!important; }
+.dropdown-menu { background:#202a39!important; border:1px solid #3c4b62!important; }
+.dropdown-menu a:hover,.nav>li>a:hover { background:#2d405e!important; }
+.container { max-width:1440px; }
+h1,h2,h3,h4,legend { color:#eff5ff!important; }
+.cbi-section,.cbi-section-node,.cbi-map-descr,.table { border-radius:12px; }
+.cbi-section,.cbi-section-node { background:#192230; border:1px solid #303b4c; padding:18px; margin-bottom:18px; }
+.cbi-section .cbi-section-node { border:0; padding:8px; }
+input,select,textarea { background:#101923!important; color:#edf4ff!important; border:1px solid #45546c!important; border-radius:7px!important; }
+input:focus,select:focus,textarea:focus { outline:2px solid #73a9ff; outline-offset:1px; }
+.btn,.cbi-button { border-radius:7px!important; background:#29384c; color:#edf4ff; border:1px solid #4d6080; }
+.cbi-button-positive,.cbi-button-apply,.cbi-button-save { background:#3168b8!important; color:white!important; }
+.table .tr:nth-child(2n),tr:nth-child(2n) { background:#202b3b; }
+.table .tr:nth-child(2n+1),tr:nth-child(2n+1) { background:#192230; }
+.table .th,.table .td,td,th { border-color:#354155!important; color:#e4ebf5; }
+a { color:#91baff; }
+.alert-message { background:#28384e; color:#edf4ff; border:1px solid #536783; border-radius:9px; }
+footer { color:#9cacbf; border-top:1px solid #303b4c; margin-top:36px; }
+.tabs,.cbi-tabmenu { border-color:#354155; }
+.studio-hero { background:linear-gradient(110deg,#233e62,#192332); border:1px solid #3b567b; padding:30px; border-radius:16px; margin-bottom:24px; }
+.studio-eyebrow { color:#9ec4ff; letter-spacing:.14em; font-size:12px; font-weight:700; }
+.studio-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; margin:20px 0; }
+.studio-card { background:#192230; border:1px solid #354155; border-radius:13px; padding:22px; }
+.studio-card h3 { margin:0 0 12px; font-size:16px; }
+.studio-number { font-size:30px; font-weight:650; color:#d8e8ff; }
+.studio-muted { color:#a6b6cc; }
+.studio-link { display:block; padding:10px 0; border-bottom:1px solid #303b4c; }
+.studio-badge { display:inline-block; border-radius:20px; padding:3px 10px; background:#283e5c; color:#b3d2ff; font-size:12px; }
+@media(max-width:768px) {
+ header{display:flex!important;flex-wrap:wrap;padding:8px 12px!important;gap:6px}
+ header .brand{font-size:15px;display:block!important;width:100%;white-space:nowrap;padding:0!important}
+ header .nav{display:flex;flex-wrap:wrap;float:none!important;margin:0!important;flex:1}
+ header .nav>li>a{padding:6px 9px!important}
+ header #indicators{position:static!important;align-self:center;font-size:10px}
+ .studio-hero{padding:20px}.studio-grid{grid-template-columns:1fr}.cbi-section{padding:12px}
+ .cbi-value{display:block}.cbi-value-title{width:auto!important;float:none!important;display:block}
+ .cbi-value-field{margin-left:0!important;max-width:100%}input,select,textarea{max-width:100%;box-sizing:border-box}
+ .cbi-section-table{display:block;overflow-x:auto}
+}
