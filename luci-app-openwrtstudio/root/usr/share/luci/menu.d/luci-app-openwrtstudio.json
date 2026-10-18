@@ -1,7 +1,0 @@
-{
- "admin/studio": {
-  "title": "Studio", "order": 5,
-  "action": {"type": "view", "path": "openwrtstudio/dashboard"},
-  "depends": {"acl": ["luci-app-openwrtstudio"]}
- }
-}

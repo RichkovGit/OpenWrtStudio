@@ -1,6 +1,0 @@
-{
- "luci-app-openwrtstudio": {
-  "description": "Read system information for Studio dashboard",
-  "read": {"ubus": {"system": ["board", "info"], "luci-rpc": ["getDHCPLeases"], "service": ["list"]}}
- }
-}
