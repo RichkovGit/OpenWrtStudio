@@ -21,6 +21,7 @@ public static class ForkopNodeParser
         var entries = new Dictionary<string, Entry>(StringComparer.Ordinal);
         Entry Get(string tag) => entries.TryGetValue(tag, out var e) ? e : entries[tag] = new(tag);
         string final = "";
+        var sections = new HashSet<string>(StringComparer.Ordinal);
         foreach (var doc in Documents(Section(output, "SINGBOX_CONFIG")))
         {
             using (doc)
@@ -43,6 +44,7 @@ public static class ForkopNodeParser
             using (doc)
             {
                 var root = doc.RootElement;
+                var section = Text(root, "section"); if (section.Length > 0) sections.Add(section);
                 if (root.TryGetProperty("servers", out var servers) && servers.ValueKind == JsonValueKind.Object)
                     foreach (var p in servers.EnumerateObject())
                     {
@@ -51,7 +53,16 @@ public static class ForkopNodeParser
                         else Metadata(e, p.Value);
                     }
                 if (root.TryGetProperty("outboundMetadata", out var metadata) && metadata.ValueKind == JsonValueKind.Object)
-                    foreach (var p in metadata.EnumerateObject()) Metadata(Get(p.Name), p.Value);
+                {
+                    if (metadata.TryGetProperty("names", out var names) && names.ValueKind == JsonValueKind.Object)
+                        foreach (var p in names.EnumerateObject())
+                            if (p.Value.ValueKind == JsonValueKind.String) Get(p.Name).Name = p.Value.GetString() ?? p.Name;
+                    if (metadata.TryGetProperty("protocols", out var protocols) && protocols.ValueKind == JsonValueKind.Object)
+                        foreach (var p in protocols.EnumerateObject())
+                            if (p.Value.ValueKind == JsonValueKind.String) Get(p.Name).Type = p.Value.GetString() ?? "";
+                    foreach (var p in metadata.EnumerateObject())
+                        if (!new[] { "names", "protocols", "countries", "transports", "securities" }.Contains(p.Name)) Metadata(Get(p.Name), p.Value);
+                }
                 foreach (var (key, kind) in new[] { ("urltestGroups", "URLTest"), ("priorityGroups", "Priority") })
                 {
                     if (!root.TryGetProperty(key, out var groups)) continue;
@@ -89,10 +100,20 @@ public static class ForkopNodeParser
         var groupsList = entries.Values.Where(e => Group(e) && !Internal(e)).ToList();
         var referenced = groupsList.SelectMany(e => e.Members).ToHashSet(StringComparer.Ordinal);
         var roots = groupsList.Where(e => !referenced.Contains(e.Tag)).ToList();
-        var rootTag = entries.ContainsKey(final) ? final : entries.ContainsKey("main-out") ? "main-out" : roots.Count == 1 ? roots[0].Tag : "";
+        var rootTags = sections.Select(section => section + "-out" + (section is "direct" or "bypass" ? "-1" : ""))
+            .Where(tag => entries.TryGetValue(tag, out var e) && Group(e) && !Internal(e)).ToHashSet(StringComparer.Ordinal);
+        if (rootTags.Count == 0)
+        {
+            if (entries.TryGetValue(final, out var e) && Group(e) && !Internal(e)) rootTags.Add(final);
+            else if (entries.TryGetValue("main-out", out e) && Group(e)) rootTags.Add("main-out");
+            else if (roots.Count == 1) rootTags.Add(roots[0].Tag);
+        }
         var active = new HashSet<string>(StringComparer.Ordinal);
-        var current = rootTag;
-        while (entries.TryGetValue(current, out var selected) && selected.Live && active.Add(current)) current = selected.Now;
+        foreach (var root in rootTags)
+        {
+            var current = root;
+            while (entries.TryGetValue(current, out var selected) && selected.Live && active.Add(current)) current = selected.Now;
+        }
         int? ResolveDelay(Entry e, HashSet<string> seen)
         {
             if (!seen.Add(e.Tag)) return null;
@@ -102,7 +123,8 @@ public static class ForkopNodeParser
         string SelectGroup(Entry target)
         {
             var parents = groupsList.Where(e => e.Live && e.Mutable && e.Tag != target.Tag && e.Members.Contains(target.Tag)).ToList();
-            if (parents.Any(e => e.Tag == rootTag)) return rootTag;
+            var directParents = parents.Where(e => rootTags.Contains(e.Tag)).ToList();
+            if (directParents.Count == 1) return directParents[0].Tag;
             var activeParents = parents.Where(e => active.Contains(e.Tag)).ToList();
             return activeParents.Count == 1 ? activeParents[0].Tag : parents.Count == 1 ? parents[0].Tag : "";
         }
