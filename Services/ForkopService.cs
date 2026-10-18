@@ -245,25 +245,6 @@ nslookup rutracker.org 127.0.0.1 >/dev/null 2>&1 && echo 'blocked_dns:ok' || ech
     {
         var section = new ForkopSection();
 
-        // Default subscriptions and rulesets matching Forkop configuration
-        var defaultSubs = new[]
-        {
-            "https://e3c21848.withblancvpn.online/s/95e38fa08f064eaeab14a8ee4a56ec189",
-            "https://subscriptions.production.stealthsurfconnectivity.net/to/3e3d1e0477f3065d55effb37",
-            "https://sub.abuzvpn.com/-WFFdGwSRQYSvDMR",
-            "https://sub.vlessfo.ru/vlessforu/working_configs.txt"
-        };
-
-        var defaultRules = new[]
-        {
-            "Russia inside", "Block", "Новости", "Porn", "Anime", "H.O.D.C.A",
-            "Geo Block", "Youtube", "Discord", "Meta", "Twitter (X)", "Google AI",
-            "HDRəzka", "Tik-Tok", "Telegram", "Roblox", "Supercell", "GitHub"
-        };
-
-        foreach (var s in defaultSubs) section.SubscriptionUrls.Add(s);
-        foreach (var r in defaultRules) section.Rulesets.Add(r);
-
         if (!_ssh.IsConnected) return section;
 
         try
@@ -412,10 +393,10 @@ fi
         {
             const string statsCmd = @"
 echo '===PROCS==='
-pidof forkop 2>/dev/null
-pidof sing-box 2>/dev/null
+[ -x /etc/init.d/forkop ] && /etc/init.d/forkop running >/dev/null 2>&1 && echo forkop:running
+pidof sing-box >/dev/null 2>&1 && echo sing-box:running
 echo '===CONNS==='
-wc -l < /proc/net/nf_conntrack 2>/dev/null || cat /proc/sys/net/netfilter/nf_conntrack_count 2>/dev/null || echo '35'
+wc -l < /proc/net/nf_conntrack 2>/dev/null || cat /proc/sys/net/netfilter/nf_conntrack_count 2>/dev/null || echo '0'
 echo '===MEM==='
 free -m 2>/dev/null | grep Mem | awk '{printf ""%.1f MB"", $3}'
 echo '===DEV==='
@@ -425,8 +406,8 @@ cat /proc/net/dev 2>/dev/null | grep -E 'eth0|br-lan|wan' | head -n 1
             if (code == 0 && !string.IsNullOrWhiteSpace(output))
             {
                 var procs = ExtractSection(output, "PROCS");
-                stats.IsForkopRunning = procs.Contains("forkop") || procs.Length > 2;
-                stats.IsSingboxRunning = procs.Contains("sing-box") || procs.Length > 2;
+                stats.IsForkopRunning = procs.Contains("forkop:running");
+                stats.IsSingboxRunning = procs.Contains("sing-box:running");
 
                 var conns = ExtractSection(output, "CONNS");
                 if (int.TryParse(conns.Trim(), out var count))
@@ -451,53 +432,7 @@ cat /proc/net/dev 2>/dev/null | grep -E 'eth0|br-lan|wan' | head -n 1
 
     public async Task<List<ForkopSubscriptionInfo>> GetSubscriptionInfoListAsync()
     {
-        var defaultList = new List<ForkopSubscriptionInfo>
-        {
-            new()
-            {
-                Name = "BlancVPN",
-                Url = "https://e3c21848.withblancvpn.online/s/...",
-                TrafficUsed = "1.2 GB",
-                TrafficTotal = "∞",
-                ExpireDate = "01.01.2030",
-                ServerCount = 49,
-                Description = "Основной провайдер обхода блокировок.",
-                TrafficPercentage = 5
-            },
-            new()
-            {
-                Name = "StealthSurf",
-                Url = "https://subscriptions.production.stealthsurfconnectivity.net/to/...",
-                TrafficUsed = "230.2 GB",
-                TrafficTotal = "∞",
-                ExpireDate = "09.10.2026",
-                ServerCount = 28,
-                Description = "Если перестал работать VPN или вы его обновили, то нажмите для применения новых настроек.",
-                TrafficPercentage = 15
-            },
-            new()
-            {
-                Name = "AbuzVPN",
-                Url = "https://sub.abuzvpn.com/-WFFdGwSRQYSvDMR",
-                TrafficUsed = "32.9 MB",
-                TrafficTotal = "32.2 GB",
-                ExpireDate = "26775 дней",
-                ServerCount = 42,
-                Description = "AbuzVPN — лучший ускоритель для интернета. Тарификация ведётся только на локациях WhiteList. ЕСЛИ НЕ РАБОТАЕТ — ОБНОВИТЕ ПОДПИСКУ",
-                TrafficPercentage = 0.5
-            },
-            new()
-            {
-                Name = "Tg: Vlessforu ❤️ FREE",
-                Url = "https://sub.vlessfo.ru/vlessforu/working_configs.txt",
-                TrafficUsed = "0 B",
-                TrafficTotal = "73.7 TB",
-                ExpireDate = "11.09.6767",
-                ServerCount = 207,
-                Description = "Серверов: 207 | Обновлено: 09.09.2026 15:05 | Обязательно подпишитесь на VlessForu в Телеграме! LTE для крайних случаев! Без торрентов!",
-                TrafficPercentage = 0.1
-            }
-        };
+        var defaultList = new List<ForkopSubscriptionInfo>();
 
         if (!_ssh.IsConnected) return defaultList;
 
@@ -523,17 +458,7 @@ cat /proc/net/dev 2>/dev/null | grep -E 'eth0|br-lan|wan' | head -n 1
 
     public async Task<List<ForkopServerNode>> GetServersAsync()
     {
-        var defaultList = new List<ForkopServerNode>
-        {
-            new() { Name = "Авто Blanc (Основной)", Protocol = "URLTest", Subtitle = "Автовыбор лучшего", Provider = "Blanc", LatencyMs = null, IsAutoGroup = true },
-            new() { Name = "Авто Stealth (Запасной)", Protocol = "URLTest", Subtitle = "Резервный пул", Provider = "Stealth", LatencyMs = 236, IsAutoGroup = true },
-            new() { Name = "Авто Фри (Резерв)", Protocol = "URLTest", Subtitle = "Бесплатные ноды", Provider = "Vless4U", LatencyMs = null, IsAutoGroup = true },
-            new() { Name = "Приоритет: Blanc -> Stealth -> Free", Protocol = "Priority", Subtitle = "Отказоустойчивая цепочка", Provider = "Системный", LatencyMs = 238, IsActive = true, IsAutoGroup = true },
-            new() { Name = "Abuz 🇷🇺 GAME | Нидерланды", Protocol = "Hysteria2", Subtitle = "Быстрый UDP/Gaming", Provider = "Abuz", LatencyMs = 210 },
-            new() { Name = "Stealth 🚀 Премиум-конфиг (ранний доступ)", Protocol = "Hysteria2", Subtitle = "Анти-DPI / Трафик", Provider = "Stealth", LatencyMs = 236 },
-            new() { Name = "Abuz ⚡ WebSocket | Польша", Protocol = "VLESS", Subtitle = "CDN / Port 443", Provider = "Abuz", LatencyMs = 279 },
-            new() { Name = "Abuz 🛡️ Shadowsocks | Польша", Protocol = "Shadowsocks", Subtitle = "Защищенный прокси", Provider = "Abuz", LatencyMs = 297 }
-        };
+        var defaultList = new List<ForkopServerNode>();
 
         if (!_ssh.IsConnected) return defaultList;
 
@@ -543,9 +468,9 @@ cat /proc/net/dev 2>/dev/null | grep -E 'eth0|br-lan|wan' | head -n 1
 echo '===SECTION_CACHE==='
 cat /var/run/forkop/section-cache/*.json 2>/dev/null || cat /etc/forkop/section-cache/*.json 2>/dev/null
 echo '===SINGBOX_CONFIG==='
-head -c 600000 /etc/sing-box/config.json 2>/dev/null
+cat /etc/sing-box/config.json 2>/dev/null
 echo '===CLASH_PROXIES==='
-/usr/bin/forkop clash_api get_proxies 2>/dev/null || curl -s http://192.168.10.1:9090/proxies 2>/dev/null || curl -s http://127.0.0.1:9090/proxies 2>/dev/null
+/usr/bin/forkop clash_api get_proxies 2>/dev/null
 echo '===PASSWALL_NODES==='
 uci -q show passwall 2>/dev/null | grep -E '\.remarks=|\.type=|\.address=|\.port=' 2>/dev/null
 echo '===MIHOMO_CONFIG==='
@@ -614,9 +539,9 @@ cat /etc/mihomo/run/config.yaml 2>/dev/null || cat /etc/mihomo/config.yaml 2>/de
                     }
                     else
                     {
-                        info.TrafficUsed = "1.2 GB";
+                        info.TrafficUsed = "—";
                         info.TrafficTotal = "∞";
-                        info.TrafficPercentage = 5.0;
+                        info.TrafficPercentage = 0;
                     }
 
                     if (item.TryGetProperty("expire", out var expEl) && expEl.TryGetInt64(out var expVal))
@@ -672,188 +597,8 @@ cat /etc/mihomo/run/config.yaml 2>/dev/null || cat /etc/mihomo/config.yaml 2>/de
 
     public List<ForkopServerNode> ParseAllRouterNodes(string output)
     {
-        var result = new List<ForkopServerNode>();
-
-        var cacheText = ExtractSection(output, "SECTION_CACHE");
-        var singboxText = ExtractSection(output, "SINGBOX_CONFIG");
-        var clashText = ExtractSection(output, "CLASH_PROXIES");
-        var passwallText = ExtractSection(output, "PASSWALL_NODES");
-        var mihomoText = ExtractSection(output, "MIHOMO_CONFIG");
-
-        // 1. Parse Clash proxies for active node and latency history
-        string activeNodeName = "";
-        var clashMap = new Dictionary<string, (string Type, string Now, int? Latency)>(StringComparer.OrdinalIgnoreCase);
-
-        if (!string.IsNullOrWhiteSpace(clashText))
-        {
-            try
-            {
-                using var clashDoc = JsonDocument.Parse(clashText);
-                if (clashDoc.RootElement.TryGetProperty("proxies", out var proxiesObj) && proxiesObj.ValueKind == JsonValueKind.Object)
-                {
-                    foreach (var prop in proxiesObj.EnumerateObject())
-                    {
-                        var pName = prop.Name;
-                        var pEl = prop.Value;
-                        var pType = pEl.TryGetProperty("type", out var tEl) ? (tEl.GetString() ?? "") : "";
-                        var pNow = pEl.TryGetProperty("now", out var nEl) ? (nEl.GetString() ?? "") : "";
-
-                        int? delay = null;
-                        if (pEl.TryGetProperty("history", out var histEl) && histEl.ValueKind == JsonValueKind.Array && histEl.GetArrayLength() > 0)
-                        {
-                            var lastEntry = histEl.EnumerateArray().Last();
-                            if (lastEntry.TryGetProperty("delay", out var dEl) && dEl.TryGetInt32(out var dv) && dv > 0)
-                            {
-                                delay = dv;
-                            }
-                        }
-
-                        clashMap[pName] = (pType, pNow, delay);
-
-                        if (pName.Contains("priority", StringComparison.OrdinalIgnoreCase) || pName == "main-out" || pType.Equals("Selector", StringComparison.OrdinalIgnoreCase))
-                        {
-                            if (!string.IsNullOrWhiteSpace(pNow))
-                            {
-                                activeNodeName = pNow;
-                            }
-                        }
-                    }
-                }
-            }
-            catch { }
-        }
-
-        // 2. Parse Singbox Outbounds
-        var singboxMap = new Dictionary<string, (string Type, string Server, int Port)>(StringComparer.OrdinalIgnoreCase);
-        if (!string.IsNullOrWhiteSpace(singboxText))
-        {
-            try
-            {
-                using var sbDoc = JsonDocument.Parse(singboxText);
-                if (sbDoc.RootElement.TryGetProperty("outbounds", out var outboundsEl) && outboundsEl.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var ob in outboundsEl.EnumerateArray())
-                    {
-                        var tag = ob.TryGetProperty("tag", out var tagEl) ? (tagEl.GetString() ?? "") : "";
-                        if (string.IsNullOrWhiteSpace(tag)) continue;
-
-                        var obType = ob.TryGetProperty("type", out var tEl) ? (tEl.GetString() ?? "") : "vless";
-                        var srv = ob.TryGetProperty("server", out var srvEl) ? (srvEl.GetString() ?? "") : "";
-                        int port = 443;
-                        if (ob.TryGetProperty("server_port", out var pEl) && pEl.TryGetInt32(out var pv))
-                            port = pv;
-
-                        singboxMap[tag] = (obType, srv, port);
-                    }
-                }
-            }
-            catch { }
-        }
-
-        // 3. Parse Cache JSON (servers map, urltest groups, priority groups)
-        var cacheServersMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        if (!string.IsNullOrWhiteSpace(cacheText))
-        {
-            try
-            {
-                using var cacheDoc = JsonDocument.Parse(cacheText);
-                if (cacheDoc.RootElement.TryGetProperty("servers", out var srvsObj) && srvsObj.ValueKind == JsonValueKind.Object)
-                {
-                    foreach (var prop in srvsObj.EnumerateObject())
-                    {
-                        var ip = prop.Value.ValueKind == JsonValueKind.String ? (prop.Value.GetString() ?? "") : prop.Value.ToString();
-                        cacheServersMap[prop.Name] = ip;
-                    }
-                }
-            }
-            catch { }
-        }
-
-        // 4. Build Auto-Groups (URLTest & Priority)
-        var autoGroupsDefs = new List<(string GroupTag, string DisplayName, string Protocol, string Subtitle, string Provider)>
-        {
-            ("main-urltest-blanc_urltest-out", "Авто Blanc (Основной)", "URLTest", "Автовыбор лучшего", "Blanc"),
-            ("main-urltest-stealth_urltest-out", "Авто Stealth (Запасной)", "URLTest", "Резервный пул", "Stealth"),
-            ("main-urltest-free_urltest-out", "Авто Фри (Резерв)", "URLTest", "Бесплатные ноды", "Vless4U"),
-            ("main-priority-main_priority-out", "Приоритет: Blanc -> Stealth -> Free", "Priority", "Отказоустойчивая цепочка", "Системный")
-        };
-
-        foreach (var (gTag, gName, gProto, gSub, gProv) in autoGroupsDefs)
-        {
-            clashMap.TryGetValue(gTag, out var cInfo);
-            var nowInGroup = cInfo.Now;
-            var subText = !string.IsNullOrWhiteSpace(nowInGroup) ? $"{gSub} (Активен: {nowInGroup})" : gSub;
-
-            result.Add(new ForkopServerNode
-            {
-                Name = gName,
-                GroupTag = gTag,
-                Protocol = gProto,
-                Subtitle = subText,
-                Provider = gProv,
-                LatencyMs = cInfo.Latency ?? (gProto == "Priority" ? 238 : 236),
-                IsAutoGroup = true,
-                IsActive = (gProto == "Priority" && !string.IsNullOrWhiteSpace(activeNodeName)) || (activeNodeName.Equals(gTag, StringComparison.OrdinalIgnoreCase))
-            });
-        }
-
-        // 5. Build all individual proxy server nodes (240+ servers)
-        var allServerTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var k in cacheServersMap.Keys) allServerTags.Add(k);
-        foreach (var k in singboxMap.Keys) allServerTags.Add(k);
-        foreach (var k in clashMap.Keys) allServerTags.Add(k);
-
-        // Filter out groups, direct, bypass, global, default
-        var ignoredPrefixes = new[] { "GLOBAL", "direct-out", "bypass-out", "default", "main-out", "main-urltest", "main-priority" };
-
-        var sortedTags = allServerTags
-            .Where(t => !ignoredPrefixes.Any(p => t.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
-            .OrderBy(t => t)
-            .ToList();
-
-        foreach (var tag in sortedTags)
-        {
-            singboxMap.TryGetValue(tag, out var sbInfo);
-            cacheServersMap.TryGetValue(tag, out var cacheIp);
-            clashMap.TryGetValue(tag, out var clInfo);
-
-            var proto = !string.IsNullOrWhiteSpace(sbInfo.Type) ? sbInfo.Type : (!string.IsNullOrWhiteSpace(clInfo.Type) ? clInfo.Type : "VLESS");
-            proto = FormatProtocolName(proto);
-
-            var srvAddr = !string.IsNullOrWhiteSpace(cacheIp) ? cacheIp : (sbInfo.Server ?? "");
-            int srvPort = sbInfo.Port > 0 ? sbInfo.Port : 443;
-
-            var subtitle = !string.IsNullOrWhiteSpace(srvAddr) ? $"{srvAddr}:{srvPort}" : "Прокси-сервер";
-            var provider = DetectProvider(tag);
-
-            bool isActive = !string.IsNullOrWhiteSpace(activeNodeName) && (tag.Equals(activeNodeName, StringComparison.OrdinalIgnoreCase) || tag.Contains(activeNodeName, StringComparison.OrdinalIgnoreCase));
-
-            result.Add(new ForkopServerNode
-            {
-                Name = tag,
-                Protocol = proto,
-                Subtitle = subtitle,
-                Provider = provider,
-                ServerAddress = srvAddr,
-                ServerPort = srvPort,
-                LatencyMs = clInfo.Latency,
-                IsActive = isActive,
-                IsAutoGroup = false
-            });
-        }
-
-        // 6. Fallback: Parse PassWall nodes if Forkop returned no nodes
-        if (result.Count <= 4 && !string.IsNullOrWhiteSpace(passwallText))
-        {
-            var pwNodes = ParsePasswallNodes(passwallText);
-            foreach (var pw in pwNodes)
-            {
-                result.Add(pw);
-            }
-        }
-
-        return result;
+        var nodes = ForkopNodeParser.Parse(output);
+        return nodes.Count > 0 ? nodes : ParsePasswallNodes(ExtractSection(output, "PASSWALL_NODES"));
     }
 
     private static string DetectProvider(string name)
@@ -929,99 +674,41 @@ cat /etc/mihomo/run/config.yaml 2>/dev/null || cat /etc/mihomo/config.yaml 2>/de
 
     public async Task<List<ForkopServerNode>> TestLatenciesAsync(List<ForkopServerNode> currentNodes)
     {
-        var rng = new Random();
-
-        if (_ssh.IsConnected)
+        if (!_ssh.IsConnected)
         {
-            try
-            {
-                // Trigger latency test on router
-                await _ssh.ExecuteCommandAsync("/usr/bin/forkop clash_api get_group_latency 'main-priority-main_priority-out' 2>/dev/null || true", 6);
-
-                // Fetch fresh delay measurements from Clash API
-                var (code, outStr, _) = await _ssh.ExecuteCommandAsync("/usr/bin/forkop clash_api get_proxies 2>/dev/null || curl -s http://192.168.10.1:9090/proxies 2>/dev/null", 5);
-                if (code == 0 && !string.IsNullOrWhiteSpace(outStr))
-                {
-                    using var doc = JsonDocument.Parse(outStr);
-                    if (doc.RootElement.TryGetProperty("proxies", out var proxiesObj) && proxiesObj.ValueKind == JsonValueKind.Object)
-                    {
-                        var delayMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-                        foreach (var prop in proxiesObj.EnumerateObject())
-                        {
-                            if (prop.Value.TryGetProperty("history", out var histEl) && histEl.ValueKind == JsonValueKind.Array && histEl.GetArrayLength() > 0)
-                            {
-                                var last = histEl.EnumerateArray().Last();
-                                if (last.TryGetProperty("delay", out var dEl) && dEl.TryGetInt32(out var dv) && dv > 0)
-                                {
-                                    delayMap[prop.Name] = dv;
-                                }
-                            }
-                        }
-
-                        foreach (var node in currentNodes)
-                        {
-                            if (delayMap.TryGetValue(node.Name, out var dl) || (!string.IsNullOrWhiteSpace(node.GroupTag) && delayMap.TryGetValue(node.GroupTag, out dl)))
-                            {
-                                node.LatencyMs = dl;
-                            }
-                            else
-                            {
-                                node.LatencyMs = rng.Next(180, 290);
-                            }
-                        }
-
-                        return currentNodes;
-                    }
-                }
-            }
-            catch { }
+            foreach (var node in currentNodes) node.LatencyMs = null;
+            return currentNodes;
         }
-
-        // Fallback / simulated latency for display
+        foreach (var group in currentNodes.Where(n => n.IsAutoGroup && n.Protocol == "URLTest"))
+            await _ssh.ExecuteCommandAsync($"/usr/bin/forkop clash_api get_group_latency {ShellHelper.EscapeArg(group.GroupTag)}", 10);
+        var fresh = await GetServersAsync();
+        var byTag = fresh.ToDictionary(n => n.GroupTag, StringComparer.Ordinal);
         foreach (var node in currentNodes)
-        {
-            if (node.Name.Contains("Резерв") || node.Name.Contains("Blanc (Основной)"))
-            {
-                node.LatencyMs = rng.Next(0, 3) == 0 ? null : rng.Next(180, 260);
-            }
-            else
-            {
-                node.LatencyMs = rng.Next(190, 310);
-            }
-        }
-
+            node.LatencyMs = byTag.TryGetValue(node.GroupTag, out var live) ? live.LatencyMs : null;
         return currentNodes;
     }
 
     public async Task<(bool Success, string Message)> SelectActiveServerAsync(ForkopServerNode server)
     {
-        if (_ssh.IsConnected)
+        if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру по SSH.");
+        try
         {
-            try
-            {
-                var targetName = !string.IsNullOrWhiteSpace(server.GroupTag) ? server.GroupTag : server.Name;
-                var safeTargetArg = ShellHelper.EscapeArg(targetName);
-                var jsonBody = System.Text.Json.JsonSerializer.Serialize(new { name = targetName });
-                var safeJsonArg = ShellHelper.EscapeArg(jsonBody);
-
-                var sb = new System.Text.StringBuilder();
-                // 1. Clash API live runtime switch
-                sb.AppendLine($"/usr/bin/forkop clash_api set_group_proxy main-priority-main_priority-out {safeTargetArg} 2>/dev/null || true");
-                sb.AppendLine($"/usr/bin/forkop clash_api set_group_proxy main-out {safeTargetArg} 2>/dev/null || true");
-                sb.AppendLine($"curl -s -X PUT http://127.0.0.1:9090/proxies/main-priority-main_priority-out -H 'Content-Type: application/json' -d {safeJsonArg} 2>/dev/null || true");
-                // 2. UCI persistent configuration
-                sb.AppendLine($"uci set forkop.vpn_proxy.selected_node={safeTargetArg} 2>/dev/null || true");
-                sb.AppendLine("uci commit forkop 2>/dev/null || true");
-
-                await _ssh.ExecuteCommandAsync(sb.ToString(), 5);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[ForkopService] SelectActiveServerAsync error: {ex.Message}");
-            }
+            var nodes = await GetServersAsync();
+            var target = nodes.FirstOrDefault(n => n.GroupTag == server.GroupTag);
+            if (target == null || string.IsNullOrEmpty(target.SelectionGroupTag))
+                return (false, "Узел не входит в доступный селектор. Обновите список или выберите группу в панели ForkOP.");
+            var parent = nodes.FirstOrDefault(n => n.GroupTag == target.SelectionGroupTag);
+            if (parent == null || !parent.HasLiveState || !parent.Candidates.Contains(target.GroupTag))
+                return (false, "Состав селектора изменился. Обновите список.");
+            var command = $"/usr/bin/forkop clash_api set_group_proxy {ShellHelper.EscapeArg(parent.GroupTag)} {ShellHelper.EscapeArg(target.GroupTag)}";
+            var (code, _, error) = await _ssh.ExecuteCommandAsync(command, 10);
+            if (code != 0) return (false, $"Роутер отклонил переключение: {error}");
+            var confirmed = (await GetServersAsync()).FirstOrDefault(n => n.GroupTag == parent.GroupTag);
+            return confirmed?.CurrentNode == target.GroupTag
+                ? (true, $"Роутер подтвердил выбор: {target.Name}")
+                : (false, "Команда отправлена, но роутер не подтвердил новый выбор. Обновите список.");
         }
-
-        return (true, $"Активным узлом выбран: {server.Name}");
+        catch (Exception ex) { return (false, $"Не удалось переключить узел: {ex.Message}"); }
     }
 
     private static string FormatBytes(long bytes)

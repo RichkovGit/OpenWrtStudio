@@ -34,7 +34,7 @@ public partial class ForkopViewModel : ObservableObject
 
     public ObservableCollection<string> AvailableProviders { get; } = new()
     {
-        "Все", "Blanc", "Stealth", "Abuz", "Vless4U", "Прочие"
+        "Все"
     };
 
     public ObservableCollection<string> AvailableProtocols { get; } = new()
@@ -146,7 +146,11 @@ public partial class ForkopViewModel : ObservableObject
             Servers = new ObservableCollection<ForkopServerNode>(nodes);
             AutoGroups = new ObservableCollection<ForkopServerNode>(nodes.Where(n => n.IsAutoGroup));
             ApplyServerFilter();
-            SelectedServer = nodes.FirstOrDefault(n => n.IsActive) ?? nodes.FirstOrDefault();
+            SelectedServer = nodes.FirstOrDefault(n => n.IsActive);
+            var oldProvider = SelectedProviderFilter;
+            AvailableProviders.Clear(); AvailableProviders.Add("Все");
+            foreach (var provider in nodes.Where(n => !n.IsAutoGroup).Select(n => n.Provider).Where(p => p.Length > 0).Distinct().OrderBy(p => p)) AvailableProviders.Add(provider);
+            if (!AvailableProviders.Contains(oldProvider)) SelectedProviderFilter = "Все";
 
             // 4. Section Config
             Section = await _forkopService.GetSectionConfigAsync();
@@ -208,7 +212,7 @@ public partial class ForkopViewModel : ObservableObject
             Servers = new ObservableCollection<ForkopServerNode>(updated);
             AutoGroups = new ObservableCollection<ForkopServerNode>(updated.Where(n => n.IsAutoGroup));
             ApplyServerFilter();
-            StatusMessage = "Тестирование задержки завершено успешно.";
+            StatusMessage = "Показаны доступные измерения роутера; N/A означает отсутствие результата.";
         }
         catch (Exception ex)
         {
@@ -225,23 +229,15 @@ public partial class ForkopViewModel : ObservableObject
     {
         if (node == null) return;
 
-        foreach (var s in Servers)
-        {
-            s.IsActive = (s == node || s.Name == node.Name);
-        }
-        foreach (var a in AutoGroups)
-        {
-            a.IsActive = (a == node || a.Name == node.Name);
-        }
-        foreach (var f in FilteredServers)
-        {
-            f.IsActive = (f == node || f.Name == node.Name);
-        }
-        SelectedServer = node;
-
         StatusMessage = $"Выбор активного сервера: {node.Name}...";
-        var (success, msg) = await _forkopService.SelectActiveServerAsync(node);
-        StatusMessage = msg;
+        var (_, message) = await _forkopService.SelectActiveServerAsync(node);
+        // Only a fresh router snapshot may update the active markers, including failed switches.
+        var fresh = await _forkopService.GetServersAsync();
+        Servers = new ObservableCollection<ForkopServerNode>(fresh);
+        AutoGroups = new ObservableCollection<ForkopServerNode>(fresh.Where(n => n.IsAutoGroup));
+        SelectedServer = fresh.FirstOrDefault(n => n.IsActive);
+        ApplyServerFilter();
+        StatusMessage = message;
     }
 
     // Section editing commands

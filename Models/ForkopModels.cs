@@ -38,23 +38,29 @@ public partial class ForkopServerNode : ObservableObject
     [ObservableProperty] private string _serverAddress = "";
     [ObservableProperty] private int _serverPort;
     [ObservableProperty] private string _groupTag = "";
-    [ObservableProperty] private int? _latencyMs;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LatencyDisplay))]
+    private int? _latencyMs;
     [ObservableProperty] private bool _isActive;
     [ObservableProperty] private bool _isAutoGroup;
+    [ObservableProperty] private string _currentNode = "";
+    [ObservableProperty] private string _selectionGroupTag = "";
+    [ObservableProperty] private System.Collections.Generic.List<string> _candidates = new();
+    [ObservableProperty] private bool _hasLiveState;
 
     public string LatencyDisplay => LatencyMs.HasValue ? $"{LatencyMs.Value}ms" : "N/A";
 }
 
 public partial class ForkopDashboardStats : ObservableObject
 {
-    [ObservableProperty] private string _inSpeed = "1.42 KB/s";
-    [ObservableProperty] private string _outSpeed = "0 B/s";
-    [ObservableProperty] private string _totalIn = "1.56 MB";
-    [ObservableProperty] private string _totalOut = "395 KB";
-    [ObservableProperty] private int _activeConnections = 35;
-    [ObservableProperty] private string _memoryUsage = "23.7 MB";
-    [ObservableProperty] private bool _isForkopRunning = true;
-    [ObservableProperty] private bool _isSingboxRunning = true;
+    [ObservableProperty] private string _inSpeed = "—";
+    [ObservableProperty] private string _outSpeed = "—";
+    [ObservableProperty] private string _totalIn = "—";
+    [ObservableProperty] private string _totalOut = "—";
+    [ObservableProperty] private int _activeConnections;
+    [ObservableProperty] private string _memoryUsage = "—";
+    [ObservableProperty] private bool _isForkopRunning;
+    [ObservableProperty] private bool _isSingboxRunning;
 }
 
 public partial class ForkopFeedInfo : ObservableObject
