@@ -28,6 +28,7 @@ jobs:
         run: |
           python luci/tests/backend.py
           python luci/tests/sentinel.py
+          python luci/tests/theme_restore.py
           python luci/tests/browser.py
       - name: Build candidate IPK and source archive
         run: python luci/scripts/build.py

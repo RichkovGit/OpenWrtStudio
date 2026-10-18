@@ -89,6 +89,7 @@ cp /etc/mihomo/config.yaml.studio-backup /etc/mihomo/config.yaml
 python3 luci/scripts/build.py
 python3 luci/tests/backend.py
 python3 luci/tests/sentinel.py
+python3 luci/tests/theme_restore.py
 python3 luci/tests/browser.py
 ```
 
