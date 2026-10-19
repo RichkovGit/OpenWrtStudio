@@ -1,0 +1,78 @@
+{
+  "admin/studio": {
+    "title": "OpenWrt Studio",
+    "order": 15,
+    "action": {
+      "type": "firstchild"
+    },
+    "depends": {
+      "acl": [
+        "luci-app-studio"
+      ]
+    }
+  },
+  "admin/studio/overview": {
+    "title": "Обзор сети",
+    "order": 1,
+    "action": {
+      "type": "view",
+      "path": "studio/overview"
+    }
+  },
+  "admin/studio/capabilities": {
+    "title": "VPN и возможности",
+    "order": 2,
+    "action": {
+      "type": "view",
+      "path": "studio/capabilities"
+    }
+  },
+  "admin/studio/diagnostics": {
+    "title": "Диагностика · Sentinel",
+    "order": 3,
+    "action": {
+      "type": "view",
+      "path": "studio/diagnostics"
+    }
+  },
+  "admin/studio/mihomo": {
+    "title": "Конструктор Mihomo",
+    "order": 4,
+    "action": {
+      "type": "view",
+      "path": "studio/mihomo"
+    }
+  },
+  "admin/studio/tools": {
+    "title": "Настройки и инструменты",
+    "order": 5,
+    "action": {
+      "type": "view",
+      "path": "studio/tools"
+    }
+  },
+  "admin/studio/vpn": {
+    "title": "Конструкторы VPN",
+    "order": 3,
+    "action": {
+      "type": "view",
+      "path": "studio/vpn"
+    }
+  },
+  "admin/studio/mesh": {
+    "title": "Tailscale / ZeroTier",
+    "order": 4,
+    "action": {
+      "type": "view",
+      "path": "studio/mesh"
+    }
+  },
+  "admin/studio/sentinel": {
+    "title": "Фоновый Sentinel",
+    "order": 6,
+    "action": {
+      "type": "view",
+      "path": "studio/sentinel"
+    }
+  }
+}

@@ -1,0 +1,162 @@
+#!/bin/sh
+# Fixed RPC methods; no client-supplied shell command or destination path.
+. /usr/share/libubox/jshn.sh
+emit_error() { json_init; json_add_boolean ok 0; json_add_string error "$1"; json_dump; }
+result() { json_init; json_add_boolean ok "$1"; json_add_string output "$2"; json_dump; }
+case "$1" in
+list)
+ echo '{"status":{},"probe":{},"action":{"name":"","service":""},"mihomo":{"content":""},"vpnconfig":{"kind":"","content":""},"mesh":{"kind":"","key":"","routes":"","exitnode":false,"accept":true}}'
+ ;;
+call)
+ read -r request
+ case "$2" in
+ status)
+  json_init
+  json_add_array services
+  for service in studio-sentinel mihomo sing-box xray dnsmasq tailscale zerotier openvpn smartdns mosdns passwall2; do
+   json_add_object ''
+   json_add_string name "$service"
+   installed=0; [ -x "/etc/init.d/$service" ] && installed=1
+   json_add_boolean installed "$installed"
+   running=0
+   if [ "$installed" = 1 ]; then /etc/init.d/"$service" running >/dev/null 2>&1 && running=1; fi
+   json_add_boolean running "$running"
+   json_close_object
+  done
+  json_close_array
+  json_add_string overlay "$(df -Pk /overlay 2>/dev/null | tail -n 1 | awk '{print $5}')"
+  json_add_string architecture "$(. /etc/openwrt_release; printf '%s' "$DISTRIB_ARCH")"
+  json_add_boolean ok 1
+  json_dump
+ ;;
+ probe)
+  output="$(
+   printf 'WAN\n'; ubus call network.interface.wan status 2>&1
+   printf '\nВнешняя связность (ICMP)\n'
+   ping -c 1 -W 2 1.1.1.1 2>&1
+   printf '\nЛокальный DNS\n'; nslookup openwrt.org 127.0.0.1 2>&1
+   printf '\nПубличный DNS\n'; nslookup openwrt.org 1.1.1.1 2>&1
+   printf '\nИнтерфейсы\n'; ip -s link 2>&1
+   printf '\nМаршруты\n'; ip route 2>&1
+  )"
+  result 1 "$output"
+ ;;
+ action)
+  json_load "$request" || { emit_error 'Invalid JSON'; exit 0; }
+  json_get_var name name
+  json_get_var service service
+  case "$service" in studio-sentinel|mihomo|sing-box|xray|dnsmasq|tailscale|zerotier|openvpn|smartdns|mosdns|passwall2) ;; *) emit_error 'Unsupported service'; exit 0;; esac
+  case "$name" in start|stop|restart|reload) ;; *) emit_error 'Unsupported action'; exit 0;; esac
+  [ -x "/etc/init.d/$service" ] || { emit_error 'Service is not installed'; exit 0; }
+  output="$(/etc/init.d/"$service" "$name" 2>&1)"; code=$?
+  if [ "$code" = 0 ]; then result 1 "$output"; else result 0 "$output"; fi
+ ;;
+ mihomo)
+  json_load "$request" || { emit_error 'Invalid JSON'; exit 0; }
+  json_get_var content content
+  [ "${#content}" -le 262144 ] && [ -n "$content" ] || { emit_error 'Config must be 1–262144 bytes'; exit 0; }
+  command -v mihomo >/dev/null 2>&1 || { emit_error 'Mihomo is not installed'; exit 0; }
+  [ -x /etc/init.d/mihomo ] || { emit_error 'Expected /etc/init.d/mihomo'; exit 0; }
+  [ ! -L /etc/mihomo ] && [ ! -L /etc/mihomo/config.yaml ] && [ ! -L /etc/mihomo/config.yaml.studio-backup ] || { emit_error 'Symlink destination is not supported'; exit 0; }
+  umask 077
+  mkdir -p /etc/mihomo || { emit_error 'Cannot create directory'; exit 0; }
+  mkdir /etc/mihomo/.studio-lock 2>/dev/null || { emit_error 'Another configuration operation is active'; exit 0; }
+  temporary=''
+  trap 'rm -f "$temporary"; rmdir /etc/mihomo/.studio-lock' EXIT
+  trap 'exit 1' HUP INT TERM
+  temporary="$(mktemp /etc/mihomo/.studio.XXXXXX)" || { emit_error 'Cannot create temporary file'; exit 0; }
+  printf '%s\n' "$content" > "$temporary" || { emit_error 'Cannot write config'; exit 0; }
+  output="$(mihomo -t -d /etc/mihomo -f "$temporary" 2>&1)"; code=$?
+  [ "$code" = 0 ] || { result 0 "$output"; exit 0; }
+  if [ -f /etc/mihomo/config.yaml ]; then
+   cp -p /etc/mihomo/config.yaml /etc/mihomo/config.yaml.studio-backup || { emit_error 'Backup failed'; exit 0; }
+  fi
+  mv "$temporary" /etc/mihomo/config.yaml || { emit_error 'Replace failed'; exit 0; }
+  output="$(/etc/init.d/mihomo restart 2>&1)"; code=$?
+  if [ "$code" = 0 ]; then result 1 'Configuration saved; restart command succeeded. Verify service status.'; else result 0 "Configuration saved, restart failed: $output"; fi
+ ;;
+ vpnconfig)
+  json_load "$request" || { emit_error 'Invalid JSON'; exit 0; }
+  json_get_var kind kind
+  json_get_var content content
+  [ -n "$content" ] && [ "${#content}" -le 262144 ] || { emit_error 'Invalid config size'; exit 0; }
+  case "$kind" in
+   sing-box) directory=/etc/sing-box; destination=/etc/sing-box/config.json;;
+   openvpn) directory=/etc/openvpn; destination=/etc/openvpn/studio.conf;;
+   *) emit_error 'Unsupported config type'; exit 0;;
+  esac
+  [ -x "/etc/init.d/$kind" ] && command -v "$kind" >/dev/null 2>&1 || { emit_error 'VPN service/core is not installed'; exit 0; }
+  [ ! -L "$directory" ] && [ ! -L "$destination" ] && [ ! -L "$destination.studio-backup" ] || { emit_error 'Symlink destination is not supported'; exit 0; }
+  umask 077
+  mkdir -p "$directory" || { emit_error 'Cannot create directory'; exit 0; }
+  mkdir "$directory/.studio-lock" 2>/dev/null || { emit_error 'Another configuration operation is active'; exit 0; }
+  temporary=''
+  trap 'rm -f "$temporary"; rmdir "$directory/.studio-lock"' EXIT
+  trap 'exit 1' HUP INT TERM
+  temporary="$(mktemp "$directory/.studio.XXXXXX")" || { emit_error 'Cannot create temporary file'; exit 0; }
+  printf '%s\n' "$content" > "$temporary" || { emit_error 'Cannot write config'; exit 0; }
+  if [ "$kind" = sing-box ]; then
+   output="$(sing-box check -c "$temporary" 2>&1)"; code=$?
+   [ "$code" = 0 ] || { result 0 "$output"; exit 0; }
+  else
+   # Restrict imported OpenVPN to client directives and embedded key material.
+   # Never allow config/include, plugin, scripts, log paths, or external key files.
+   awk '
+    BEGIN { inline=0; client=0; remote=0; failed=0 }
+    /^[[:space:]]*([#;]|$)/ { next }
+    /^<(ca|cert|key|tls-auth|tls-crypt|extra-certs)>[[:space:]]*$/ { if (inline) { failed=1; exit }; inline=1; tag=$0; gsub(/[<>[:space:]]/, "", tag); next }
+    /^<\// { closing=$0; gsub(/[<>\/[:space:]]/, "", closing); if (!inline || closing!=tag) { failed=1; exit }; inline=0; next }
+    inline { next }
+    { key=$1; if (key=="client") client=1; if (key=="remote") remote=1;
+      if (key !~ /^(client|dev|dev-type|proto|remote|remote-random|resolv-retry|nobind|persist-key|persist-tun|remote-cert-tls|verify-x509-name|cipher|data-ciphers|data-ciphers-fallback|auth|auth-nocache|verb|mute|mute-replay-warnings|key-direction|tls-version-min|tls-cipher|tls-ciphersuites|reneg-sec|sndbuf|rcvbuf|tun-mtu|mssfix|explicit-exit-notify|ping|ping-restart|redirect-gateway|route|route-ipv6|route-nopull|pull|pull-filter|dhcp-option|connect-retry|connect-timeout|fast-io|float)$/) { failed=1; exit }
+      if (key=="dev" && $2 !~ /^(tun|tap)[0-9]*$/) { failed=1; exit }
+    }
+    END { if (failed || inline || !client || !remote) exit 1 }
+   ' "$temporary" || { emit_error 'Unsupported or malformed OpenVPN client profile'; exit 0; }
+  fi
+  if [ -f "$destination" ]; then cp -p "$destination" "$destination.studio-backup" || { emit_error 'Backup failed'; exit 0; }; fi
+  mv "$temporary" "$destination" || { emit_error 'Replace failed'; exit 0; }
+  if [ "$kind" = openvpn ]; then
+   uci set openvpn.studio=openvpn && uci set openvpn.studio.config="$destination" && uci set openvpn.studio.enabled=1 && uci commit openvpn || { emit_error 'Config saved; UCI update failed'; exit 0; }
+  fi
+  output="$(/etc/init.d/"$kind" restart 2>&1)"; code=$?
+  if [ "$code" = 0 ]; then result 1 'Configuration saved; restart command succeeded. Verify service status.'; else result 0 "Configuration saved; restart failed: $output"; fi
+ ;;
+ mesh)
+  json_load "$request" || { emit_error 'Invalid JSON'; exit 0; }
+  json_get_var kind kind
+  json_get_var key key
+  json_get_var routes routes
+  json_get_var exitnode exitnode
+  json_get_var accept accept
+  case "$kind" in
+   tailscale)
+    command -v tailscale >/dev/null 2>&1 || { emit_error 'Tailscale is not installed'; exit 0; }
+    case "$key" in tskey-auth-*) ;; *) emit_error 'Invalid Tailscale auth key'; exit 0;; esac
+    case "$key" in *[!A-Za-z0-9_-]*) emit_error 'Invalid auth key characters'; exit 0;; esac
+    case "$routes" in *[!0-9a-fA-F:.,/]*) emit_error 'Invalid subnet characters'; exit 0;; esac
+    case "$exitnode" in 1|true) exitnode=true;; 0|false) exitnode=false;; *) emit_error 'Invalid exitnode flag'; exit 0;; esac
+    case "$accept" in 1|true) accept=true;; 0|false) accept=false;; *) emit_error 'Invalid accept flag'; exit 0;; esac
+    umask 077
+    keyfile="$(mktemp /tmp/studio-tskey.XXXXXX)" || { emit_error 'Cannot create temporary file'; exit 0; }
+    trap 'rm -f "$keyfile"' EXIT
+    trap 'exit 1' HUP INT TERM
+    printf '%s' "$key" > "$keyfile"
+    /etc/init.d/tailscale start >/dev/null 2>&1 || { emit_error 'Cannot start Tailscale service'; exit 0; }
+    output="$(tailscale up --auth-key="file:$keyfile" --accept-routes="$accept" --advertise-exit-node="$exitnode" --advertise-routes="$routes" --timeout=15s 2>&1)"; code=$?
+   ;;
+   zerotier)
+    command -v zerotier-cli >/dev/null 2>&1 || { emit_error 'ZeroTier is not installed'; exit 0; }
+    [ "${#key}" = 16 ] || { emit_error 'ZeroTier network ID must contain 16 hex characters'; exit 0; }
+    case "$key" in *[!0-9a-fA-F]*) emit_error 'Invalid network ID'; exit 0;; esac
+    /etc/init.d/zerotier start >/dev/null 2>&1 || { emit_error 'Cannot start ZeroTier service'; exit 0; }
+    output="$(zerotier-cli join "$key" 2>&1)"; code=$?
+   ;;
+   *) emit_error 'Unsupported mesh VPN'; exit 0;;
+  esac
+  if [ "$code" = 0 ]; then result 1 "$output"; else result 0 "$output"; fi
+ ;;
+ *) emit_error 'Unknown method';;
+ esac
+ ;;
+esac

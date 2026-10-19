@@ -1,0 +1,7 @@
+config sentinel 'sentinel'
+ option enabled '0'
+ option interval '60'
+ option failures '3'
+ option cooldown '300'
+ option dns '1'
+ option proxy 'none'
