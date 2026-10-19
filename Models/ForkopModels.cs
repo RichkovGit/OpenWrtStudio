@@ -44,11 +44,16 @@ public partial class ForkopServerNode : ObservableObject
     [ObservableProperty] private bool _isActive;
     [ObservableProperty] private bool _isAutoGroup;
     [ObservableProperty] private string _currentNode = "";
-    [ObservableProperty] private string _selectionGroupTag = "";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSelect))]
+    private string _selectionGroupTag = "";
     [ObservableProperty] private System.Collections.Generic.List<string> _candidates = new();
-    [ObservableProperty] private bool _hasLiveState;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSelect))]
+    private bool _hasLiveState;
     [ObservableProperty] private bool _isOnActivePath;
 
+    public bool CanSelect => HasLiveState && !string.IsNullOrEmpty(SelectionGroupTag);
     public string LatencyDisplay => LatencyMs.HasValue ? $"{LatencyMs.Value}ms" : "N/A";
 }
 

@@ -398,7 +398,7 @@
 
                                     <!-- Invisible button over card to select -->
                                     <Button Grid.RowSpan="4" Opacity="0"
-                                            Command="{Binding DataContext.SelectServerCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            IsEnabled="{Binding CanSelect}" Command="{Binding DataContext.SelectServerCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding}"
                                             Cursor="Hand" />
                                 </Grid>
@@ -493,7 +493,7 @@
 
                                         <!-- Invisible button over card to select -->
                                         <Button Grid.RowSpan="4" Opacity="0"
-                                                Command="{Binding DataContext.SelectServerCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                IsEnabled="{Binding CanSelect}" Command="{Binding DataContext.SelectServerCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
                                                 Cursor="Hand" />
                                     </Grid>
@@ -758,7 +758,7 @@
                                                 </StackPanel>
 
                                                 <ui:Button Grid.Column="5" Appearance="Secondary" Content="Сделать активным" 
-                                                           Command="{Binding DataContext.SelectServerCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                           IsEnabled="{Binding CanSelect}" Command="{Binding DataContext.SelectServerCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                            CommandParameter="{Binding}"
                                                            Visibility="{Binding IsActive, Converter={StaticResource InverseBooleanConverter}}" />
                                             </Grid>
