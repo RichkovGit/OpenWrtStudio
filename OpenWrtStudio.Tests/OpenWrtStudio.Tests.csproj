@@ -22,6 +22,8 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Compile Include="../OpenWrtStudio.Core.Tests/*Tests.cs" Link="%(Filename)%(Extension)" />
+    <None Include="../OpenWrtStudio.Core.Tests/Fixtures/*.json" Link="Fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

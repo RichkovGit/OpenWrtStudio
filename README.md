@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🌐 OpenWrt Studio (WrtPilot) v2.5.19
+# 🌐 OpenWrt Studio (WrtPilot) v2.5.20 — кандидат с исправлением VPN
 
 **Современный центр управления, глубокой настройки, мониторинга и автоматического устранения неполадок для роутеров OpenWrt.**
 
@@ -15,6 +15,12 @@
 </div>
 
 ---
+
+## Исправление VPN в 2.5.20
+
+Удалены заранее заданные авто-группы, демонстрационные данные и случайные задержки. Имена и raw tag читаются из реальных кэшей ForkOP и Clash API. Активная политика секции отделена от вложенного пути маршрутизации; переключение подтверждается повторным чтением состояния. Сценарии проверяются общим с Android набором данных, основанным на схеме upstream ForkOP.
+
+Сборки кандидата Windows доступны в артефактах workflow Desktop build and tests. Linux x86_64 (AppImage и tar.gz) собирается из Flutter-приложения: [инструкция](https://github.com/RichkovGit/OpenWrtStudio-Mobile/blob/codex/fix-vpn-selection/LINUX_INSTALL.md). WPF-интерфейс Windows под Linux не переносится.
 
 ## 📖 О проекте
 

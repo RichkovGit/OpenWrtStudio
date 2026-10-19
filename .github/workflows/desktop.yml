@@ -84,3 +84,12 @@ jobs:
           name: desktop-test-results
           path: TestResults/**/*.trx
           if-no-files-found: warn
+
+  portable-core:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet test OpenWrtStudio.Core.Tests/OpenWrtStudio.Core.Tests.csproj -c Release
