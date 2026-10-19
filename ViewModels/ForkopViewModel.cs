@@ -150,11 +150,11 @@ public partial class ForkopViewModel : ObservableObject
             var oldProvider = SelectedProviderFilter;
             AvailableProviders.Clear(); AvailableProviders.Add("Все");
             foreach (var provider in nodes.Where(n => !n.IsAutoGroup).Select(n => n.Provider).Where(p => p.Length > 0).Distinct().OrderBy(p => p)) AvailableProviders.Add(provider);
-            if (!AvailableProviders.Contains(oldProvider)) SelectedProviderFilter = "Все";
+            SelectedProviderFilter = AvailableProviders.Contains(oldProvider) ? oldProvider : "Все";
             var oldProtocol = SelectedProtocolFilter;
             AvailableProtocols.Clear(); AvailableProtocols.Add("Все");
             foreach (var protocol in nodes.Where(n => !n.IsAutoGroup).Select(n => n.Protocol).Distinct().OrderBy(p => p)) AvailableProtocols.Add(protocol);
-            if (!AvailableProtocols.Contains(oldProtocol)) SelectedProtocolFilter = "Все";
+            SelectedProtocolFilter = AvailableProtocols.Contains(oldProtocol) ? oldProtocol : "Все";
 
             // 4. Section Config
             Section = await _forkopService.GetSectionConfigAsync();

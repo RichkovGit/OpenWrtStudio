@@ -255,7 +255,7 @@ public class CoreRegressionTests
     public async Task Dashboard_ConcurrentRefreshesUseOnePollAndKeepLoadingUntilItFinishes()
     {
         var router = new FakeRouter { Pending = new(TaskCreationOptions.RunContinuationsAsynchronously) };
-        var dashboard = new DashboardViewModel(router, new FakeSsh());
+        var dashboard = new DashboardViewModel(router, new FakeSsh(), action => action());
         var first = dashboard.RefreshDashboardAsync();
         await router.Started.Task.WaitAsync(TimeSpan.FromSeconds(3));
         await dashboard.RefreshDashboardAsync().WaitAsync(TimeSpan.FromSeconds(3));
@@ -275,7 +275,7 @@ public class CoreRegressionTests
     {
         var router = new FakeRouter { Pending = new(TaskCreationOptions.RunContinuationsAsynchronously) };
         var ssh = new FakeSsh();
-        var dashboard = new DashboardViewModel(router, ssh);
+        var dashboard = new DashboardViewModel(router, ssh, action => action());
         var refresh = dashboard.RefreshDashboardAsync();
         await router.Started.Task.WaitAsync(TimeSpan.FromSeconds(3));
         ssh.SetConnected(false);
@@ -296,7 +296,7 @@ public class CoreRegressionTests
     {
         var router = new FakeRouter { Pending = new(TaskCreationOptions.RunContinuationsAsynchronously) };
         var ssh = new FakeSsh();
-        var dashboard = new DashboardViewModel(router, ssh);
+        var dashboard = new DashboardViewModel(router, ssh, action => action());
         var refresh = dashboard.RefreshDashboardAsync();
         await router.Started.Task.WaitAsync(TimeSpan.FromSeconds(3));
         ssh.SetConnected(false);
@@ -312,7 +312,7 @@ public class CoreRegressionTests
     public async Task Dashboard_CurrentRefreshErrorIsVisibleAndReleasesLoadingState()
     {
         var router = new FakeRouter { Pending = new(TaskCreationOptions.RunContinuationsAsynchronously) };
-        var dashboard = new DashboardViewModel(router, new FakeSsh());
+        var dashboard = new DashboardViewModel(router, new FakeSsh(), action => action());
         var refresh = dashboard.RefreshDashboardAsync();
         router.Pending.SetException(new IOException("Router request failed"));
         await refresh.WaitAsync(TimeSpan.FromSeconds(3));

@@ -419,11 +419,12 @@
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="Провайдер: " VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,6,0" />
-                        <ui:Button Appearance="Secondary" Content="Все" Command="{Binding SetProviderFilterCommand}" CommandParameter="Все" Padding="8,3" FontSize="11" Margin="0,0,4,0" />
-                        <ui:Button Appearance="Secondary" Content="Blanc" Command="{Binding SetProviderFilterCommand}" CommandParameter="Blanc" Padding="8,3" FontSize="11" Margin="0,0,4,0" />
-                        <ui:Button Appearance="Secondary" Content="Stealth" Command="{Binding SetProviderFilterCommand}" CommandParameter="Stealth" Padding="8,3" FontSize="11" Margin="0,0,4,0" />
-                        <ui:Button Appearance="Secondary" Content="Abuz" Command="{Binding SetProviderFilterCommand}" CommandParameter="Abuz" Padding="8,3" FontSize="11" Margin="0,0,4,0" />
-                        <ui:Button Appearance="Secondary" Content="Vless4U" Command="{Binding SetProviderFilterCommand}" CommandParameter="Vless4U" Padding="8,3" FontSize="11" />
+                        <ComboBox Width="140" ItemsSource="{Binding AvailableProviders}"
+                                  SelectedItem="{Binding SelectedProviderFilter, Mode=TwoWay}"
+                                  AutomationProperties.Name="Провайдер VPN" Margin="0,0,8,0" />
+                        <ComboBox Width="130" ItemsSource="{Binding AvailableProtocols}"
+                                  SelectedItem="{Binding SelectedProtocolFilter, Mode=TwoWay}"
+                                  AutomationProperties.Name="Протокол VPN" />
                     </StackPanel>
                 </Grid>
 
@@ -694,11 +695,12 @@
                             <ui:TextBox PlaceholderText="🔍 Поиск по названию, стране (🇳🇱, 🇩🇪, 🇵🇱, 🇺🇸...), IP или порту..." 
                                         Text="{Binding ServerSearchQuery, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,10,0" />
                             <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                <ui:Button Appearance="Secondary" Content="Все" Command="{Binding SetProviderFilterCommand}" CommandParameter="Все" Padding="10,4" Margin="0,0,4,0" />
-                                <ui:Button Appearance="Secondary" Content="Blanc" Command="{Binding SetProviderFilterCommand}" CommandParameter="Blanc" Padding="10,4" Margin="0,0,4,0" />
-                                <ui:Button Appearance="Secondary" Content="Stealth" Command="{Binding SetProviderFilterCommand}" CommandParameter="Stealth" Padding="10,4" Margin="0,0,4,0" />
-                                <ui:Button Appearance="Secondary" Content="Abuz" Command="{Binding SetProviderFilterCommand}" CommandParameter="Abuz" Padding="10,4" Margin="0,0,4,0" />
-                                <ui:Button Appearance="Secondary" Content="Vless4U" Command="{Binding SetProviderFilterCommand}" CommandParameter="Vless4U" Padding="10,4" />
+                                <ComboBox Width="150" ItemsSource="{Binding AvailableProviders}"
+                                          SelectedItem="{Binding SelectedProviderFilter, Mode=TwoWay}"
+                                          AutomationProperties.Name="Провайдер VPN" Margin="0,0,8,0" />
+                                <ComboBox Width="140" ItemsSource="{Binding AvailableProtocols}"
+                                          SelectedItem="{Binding SelectedProtocolFilter, Mode=TwoWay}"
+                                          AutomationProperties.Name="Протокол VPN" />
                             </StackPanel>
                         </Grid>
 

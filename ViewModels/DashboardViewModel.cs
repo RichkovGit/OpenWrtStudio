@@ -49,7 +49,7 @@ public partial class DashboardViewModel : ObservableObject
     [ObservableProperty]
     private bool _autoRefresh = true;
 
-    public DashboardViewModel(IRouterService routerService, ISshService ssh)
+    public DashboardViewModel(IRouterService routerService, ISshService ssh, Action<Action>? dispatchToUi = null)
     {
         _routerService = routerService;
         _ssh = ssh;
@@ -66,7 +66,9 @@ public partial class DashboardViewModel : ObservableObject
                 ActionStatus = "";
                 LastUpdatedText = "Данные появятся после подключения";
             }
-            if (System.Windows.Application.Current?.Dispatcher is { } dispatcher)
+            if (dispatchToUi != null)
+                dispatchToUi(Reset);
+            else if (System.Windows.Application.Current?.Dispatcher is { } dispatcher)
                 dispatcher.Invoke(Reset);
             else Reset();
         };
