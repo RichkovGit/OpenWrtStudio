@@ -28,8 +28,9 @@ public class VpnTopologyTests
     public void ActiveSelectionFollowsTheRoutingRootNotLastSelectorOrNameSubstring()
     {
         var nodes = ForkopNodeParser.Parse(Snapshot());
-        Assert.Equal(new[] { "auto-shrimp", "main-out", "node-b", "priority-route" }, nodes.Where(n => n.IsActive).Select(n => n.GroupTag).OrderBy(x => x));
+        Assert.Equal(new[] { "auto-shrimp", "main-out", "node-b", "priority-route" }, nodes.Where(n => n.IsOnActivePath).Select(n => n.GroupTag).OrderBy(x => x));
         Assert.False(nodes.Single(n => n.GroupTag == "node-a").IsActive);
+        Assert.Equal("priority-route", Assert.Single(nodes.Where(n => n.IsAutoGroup && n.IsActive)).GroupTag);
         Assert.Equal(167, nodes.Single(n => n.GroupTag == "priority-route").LatencyMs);
         Assert.Null(nodes.Single(n => n.GroupTag == "node-b-plus").LatencyMs);
         Assert.Equal("main-out", nodes.Single(n => n.GroupTag == "node-a").SelectionGroupTag);
@@ -43,6 +44,16 @@ public class VpnTopologyTests
         var nodes = ForkopNodeParser.Parse(configOnly);
         Assert.Equal(2, nodes.Count);
         Assert.All(nodes, n => { Assert.False(n.IsActive); Assert.Null(n.LatencyMs); Assert.Empty(n.SelectionGroupTag); });
+    }
+    [Fact]
+    public void HandlesLargeTopologiesCyclesAndUnorderedHistory()
+    {
+        var proxies = Enumerable.Range(0, 300).ToDictionary(i => $"node-{i}", _ => new { type = "VLESS" });
+        Assert.Equal(300, ForkopNodeParser.Parse("===CLASH_PROXIES===\n" + JsonSerializer.Serialize(new { proxies })).Count);
+        var cycle = Snapshot().Replace("\"now\": \"auto-shrimp\"", "\"now\": \"main-out\"");
+        Assert.DoesNotContain(ForkopNodeParser.Parse(cycle), n => !n.IsAutoGroup && n.IsActive);
+        const string history = "===CLASH_PROXIES===\n{\"proxies\":{\"test\":{\"type\":\"VLESS\",\"history\":[{\"time\":\"2026-10-19T01:00:00Z\",\"delay\":7},{\"time\":\"2026-10-18T01:00:00Z\",\"delay\":99}]}}}";
+        Assert.Equal(7, Assert.Single(ForkopNodeParser.Parse(history)).LatencyMs);
     }
     [Fact]
     public async Task DisconnectedServiceReturnsNoSampleNodesSubscriptionsOrLatency()

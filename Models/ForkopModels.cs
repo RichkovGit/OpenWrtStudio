@@ -47,6 +47,7 @@ public partial class ForkopServerNode : ObservableObject
     [ObservableProperty] private string _selectionGroupTag = "";
     [ObservableProperty] private System.Collections.Generic.List<string> _candidates = new();
     [ObservableProperty] private bool _hasLiveState;
+    [ObservableProperty] private bool _isOnActivePath;
 
     public string LatencyDisplay => LatencyMs.HasValue ? $"{LatencyMs.Value}ms" : "N/A";
 }

@@ -703,10 +703,13 @@ cat /etc/mihomo/run/config.yaml 2>/dev/null || cat /etc/mihomo/config.yaml 2>/de
             var command = $"/usr/bin/forkop clash_api set_group_proxy {ShellHelper.EscapeArg(parent.GroupTag)} {ShellHelper.EscapeArg(target.GroupTag)}";
             var (code, _, error) = await _ssh.ExecuteCommandAsync(command, 10);
             if (code != 0) return (false, $"Роутер отклонил переключение: {error}");
-            var confirmed = (await GetServersAsync()).FirstOrDefault(n => n.GroupTag == parent.GroupTag);
-            return confirmed?.CurrentNode == target.GroupTag
-                ? (true, $"Роутер подтвердил выбор: {target.Name}")
-                : (false, "Команда отправлена, но роутер не подтвердил новый выбор. Обновите список.");
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                var confirmed = (await GetServersAsync()).FirstOrDefault(n => n.GroupTag == parent.GroupTag);
+                if (confirmed?.CurrentNode == target.GroupTag) return (true, $"Роутер подтвердил выбор: {target.Name}");
+                if (attempt < 2) await Task.Delay(150);
+            }
+            return (false, "Команда отправлена, но роутер не подтвердил новый выбор. Обновите список.");
         }
         catch (Exception ex) { return (false, $"Не удалось переключить узел: {ex.Message}"); }
     }

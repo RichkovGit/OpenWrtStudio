@@ -114,6 +114,7 @@ public static class ForkopNodeParser
             var current = root;
             while (entries.TryGetValue(current, out var selected) && selected.Live && active.Add(current)) current = selected.Now;
         }
+        var selectedPolicies = rootTags.Select(tag => entries[tag].Now).ToHashSet(StringComparer.Ordinal);
         int? ResolveDelay(Entry e, HashSet<string> seen)
         {
             if (!seen.Add(e.Tag)) return null;
@@ -136,7 +137,7 @@ public static class ForkopNodeParser
                 ServerAddress = e.Server, ServerPort = e.Port, Provider = Provider(e.Name),
                 Subtitle = Group(e) ? (e.Now.Length > 0 ? $"Выбран: {(entries.TryGetValue(e.Now, out var next) ? next.Name : e.Now)}" : "Текущий выбор недоступен") : e.Server.Length > 0 ? $"{e.Server}{(e.Port > 0 ? $":{e.Port}" : "")}" : "Прокси-сервер",
                 CurrentNode = e.Now, Candidates = e.Members, SelectionGroupTag = SelectGroup(e),
-                HasLiveState = e.Live, IsAutoGroup = Group(e), IsActive = active.Contains(e.Tag),
+                HasLiveState = e.Live, IsAutoGroup = Group(e), IsActive = Group(e) ? selectedPolicies.Contains(e.Tag) : active.Contains(e.Tag), IsOnActivePath = active.Contains(e.Tag),
                 LatencyMs = ResolveDelay(e, new(StringComparer.Ordinal))
             }).ToList();
     }
@@ -155,7 +156,12 @@ public static class ForkopNodeParser
     private static int? Delay(JsonElement item)
     {
         if (item.TryGetProperty("history", out var history) && history.ValueKind == JsonValueKind.Array && history.GetArrayLength() > 0)
-        { var n = Number(history[history.GetArrayLength() - 1], "delay"); return n > 0 ? n : null; }
+        {
+            var latest = history[history.GetArrayLength() - 1];
+            var dated = history.EnumerateArray().Select(entry => (Entry: entry, Valid: DateTimeOffset.TryParse(Text(entry, "time"), out var time), Time: time)).Where(x => x.Valid).OrderBy(x => x.Time).ToList();
+            if (dated.Count > 0) latest = dated[^1].Entry;
+            var value = Number(latest, "delay"); return value > 0 ? value : null;
+        }
         var delay = Number(item, "delay"); return delay > 0 ? delay : null;
     }
     private static string Text(JsonElement item, string key) => item.ValueKind == JsonValueKind.Object && item.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
