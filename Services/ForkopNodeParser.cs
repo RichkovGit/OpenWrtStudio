@@ -181,7 +181,7 @@ public static class ForkopNodeParser
         {
             while (offset < bytes.Length && char.IsWhiteSpace((char)bytes[offset])) offset++;
             if (offset == bytes.Length) break;
-            try { var reader = new Utf8JsonReader(bytes.AsSpan(offset)); docs.Add(JsonDocument.ParseValue(ref reader)); offset += (int)reader.BytesConsumed; }
+            try { var reader = new Utf8JsonReader(bytes.AsSpan(offset)); var doc = JsonDocument.ParseValue(ref reader); if (doc.RootElement.ValueKind == JsonValueKind.Object) docs.Add(doc); else doc.Dispose(); offset += (int)reader.BytesConsumed; }
             catch (JsonException) { break; }
         }
         return docs;

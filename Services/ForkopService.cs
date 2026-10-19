@@ -642,7 +642,7 @@ cat /etc/mihomo/run/config.yaml 2>/dev/null || cat /etc/mihomo/config.yaml 2>/de
                 var key = match.Groups[2].Value;
                 var val = match.Groups[3].Value;
 
-                if (!nodes.ContainsKey(id)) nodes[id] = ("", "VLESS", "", 443);
+                if (!nodes.ContainsKey(id)) nodes[id] = ("", "Unknown", "", 0);
                 var cur = nodes[id];
 
                 if (key == "remarks") cur.Remarks = val;
@@ -659,9 +659,10 @@ cat /etc/mihomo/run/config.yaml 2>/dev/null || cat /etc/mihomo/config.yaml 2>/de
             if (string.IsNullOrWhiteSpace(node.Remarks) && string.IsNullOrWhiteSpace(node.Addr)) continue;
             list.Add(new ForkopServerNode
             {
+                Id = "passwall:" + id, GroupTag = id,
                 Name = !string.IsNullOrWhiteSpace(node.Remarks) ? node.Remarks : $"PassWall {node.Addr}",
                 Protocol = node.Type,
-                Subtitle = $"{node.Addr}:{node.Port}",
+                Subtitle = node.Port > 0 ? $"{node.Addr}:{node.Port}" : node.Addr,
                 Provider = "PassWall",
                 ServerAddress = node.Addr,
                 ServerPort = node.Port,
