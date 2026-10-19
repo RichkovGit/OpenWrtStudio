@@ -33,6 +33,7 @@ public class VpnTopologyTests
         Assert.Equal("priority-route", Assert.Single(nodes.Where(n => n.IsAutoGroup && n.IsActive)).GroupTag);
         Assert.Equal(167, nodes.Single(n => n.GroupTag == "priority-route").LatencyMs);
         Assert.Null(nodes.Single(n => n.GroupTag == "node-b-plus").LatencyMs);
+        Assert.Null(nodes.Single(n => n.GroupTag == "auto-blanc").LatencyMs);
         Assert.Equal("main-out", nodes.Single(n => n.GroupTag == "node-a").SelectionGroupTag);
     }
     [Fact]

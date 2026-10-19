@@ -12,7 +12,7 @@ public static class ForkopNodeParser
         public string Tag = tag, Name = tag, Type = "", Server = "", Now = "";
         public int Port;
         public int? Delay;
-        public bool Live, Mutable;
+        public bool Live, Mutable, HasDelaySample;
         public List<string> Members = new();
     }
 
@@ -92,6 +92,7 @@ public static class ForkopNodeParser
                     e.Now = Text(p.Value, "now");
                     if (p.Value.TryGetProperty("all", out _)) e.Members = Strings(p.Value, "all");
                     e.Delay = Delay(p.Value);
+                    e.HasDelaySample = p.Value.TryGetProperty("history", out var samples) && samples.ValueKind == JsonValueKind.Array && samples.GetArrayLength() > 0 || Number(p.Value, "delay").HasValue;
                 }
             }
         }
@@ -118,7 +119,7 @@ public static class ForkopNodeParser
         int? ResolveDelay(Entry e, HashSet<string> seen)
         {
             if (!seen.Add(e.Tag)) return null;
-            if (e.Delay.HasValue) return e.Delay;
+            if (e.HasDelaySample) return e.Delay;
             return entries.TryGetValue(e.Now, out var next) ? ResolveDelay(next, seen) : null;
         }
         string SelectGroup(Entry target)
