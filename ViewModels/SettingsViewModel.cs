@@ -325,6 +325,16 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    public void Open4PdaTopic()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://4pda.to/forum/index.php?showtopic=1128057") { UseShellExecute = true });
+        }
+        catch { }
+    }
+
+    [RelayCommand]
     public void OpenAppTelegram()
     {
         try
