@@ -1,6 +1,6 @@
 ; OpenWrt Studio per-user installer. Build with scripts/build-installer.ps1.
 #ifndef MyAppVersion
-  #define MyAppVersion "2.5.20"
+  #define MyAppVersion "2.5.21"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\publish"
