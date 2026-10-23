@@ -1,3 +1,10 @@
+# OpenWrt Studio v2.5.21
+
+- В разделе «О программе» добавлена кнопка темы OpenWrt Studio на 4PDA: https://4pda.to/forum/index.php?showtopic=1128057.
+- Доступны установщик и Portable для Windows x64, а также контрольные суммы SHA-256.
+
+---
+
 # OpenWrt Studio v2.5.20
 
 Проверено 19.10.2026 на реальном роутере и Android-телефоне: переключения подтверждены независимым чтением состояния, исходный VPN и тема восстановлены. Подробности: [VPN_VALIDATION.md](VPN_VALIDATION.md).
