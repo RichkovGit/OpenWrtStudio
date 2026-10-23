@@ -1,0 +1,86 @@
+name: Publish verified Windows packages
+on:
+  push:
+    branches: [codex/fix-release-checksums]
+  workflow_dispatch:
+    inputs:
+      tag:
+        required: true
+        type: string
+      run_id:
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: finish-windows-release-${{ inputs.tag || 'v2.5.21' }}
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_TAG: ${{ inputs.tag || 'v2.5.21' }}
+      SOURCE_RUN: ${{ inputs.run_id || '39977654151' }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - name: Verify packages belong to the release tag and passed builds
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN/jobs" --paginate > source-jobs.json
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" --jq .head_sha)" = "$(git rev-parse HEAD)"
+          python3 - <<'PYTHON'
+          import json
+          jobs = json.load(open('source-jobs.json'))['jobs']
+          for name in ['desktop', 'portable-core']:
+              assert any(job['name'] == name and job['conclusion'] == 'success' for job in jobs), name
+          PYTHON
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: OpenWrtStudio-win-x64
+          path: release
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify complete versioned packages
+        run: |
+          python3 - <<'PYTHON'
+          import os, re
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          version = ET.parse('OpenWrtStudio.csproj').findtext('./PropertyGroup/Version')
+          assert os.environ['RELEASE_TAG'] == 'v' + version
+          expected = [f'OpenWrtStudio_Setup_v{version}.exe', f'OpenWrtStudio_v{version}_Portable.zip', 'SHA256SUMS.txt']
+          assert all((Path('release') / name).stat().st_size > 0 for name in expected)
+          sums = Path('release/SHA256SUMS.txt')
+          sums.write_text(sums.read_text())
+          Path('release-notes.txt').write_text(Path('RELEASE_NOTES.md').read_text().split('\n---\n', 1)[0])
+          PYTHON
+          (cd release && sha256sum -c SHA256SUMS.txt)
+      - name: Publish complete release
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > existing-release.json
+            python3 - <<'PYTHON'
+          import hashlib, json
+          from pathlib import Path
+          existing = json.load(open('existing-release.json'))
+          assert not existing['draft'], 'An unfinished draft requires review'
+          assets = {asset['name']: asset for asset in existing['assets']}
+          local = list(Path('release').iterdir())
+          assert set(assets) == {path.name for path in local}
+          for path in local:
+              assert assets[path.name]['size'] == path.stat().st_size
+              assert assets[path.name]['digest'] == 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()
+          print('The published release already contains these exact verified files.')
+          PYTHON
+            exit 0
+          fi
+          gh release create "$RELEASE_TAG" release/* --repo "$GITHUB_REPOSITORY" --verify-tag --title "OpenWrt Studio ${RELEASE_TAG#v}" --notes-file release-notes.txt --draft
+          test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets | length')" = 3
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
