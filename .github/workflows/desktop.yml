@@ -119,6 +119,8 @@ jobs:
           assert os.environ['RELEASE_TAG'] == 'v' + version
           expected = [f'OpenWrtStudio_Setup_v{version}.exe', f'OpenWrtStudio_v{version}_Portable.zip', 'SHA256SUMS.txt']
           assert all((Path('release') / name).stat().st_size > 0 for name in expected)
+          sums = Path('release/SHA256SUMS.txt')
+          sums.write_text(sums.read_text())
           Path('release-notes.txt').write_text(Path('RELEASE_NOTES.md').read_text().split('\n---\n', 1)[0])
           PYTHON
           (cd release && sha256sum -c SHA256SUMS.txt)
