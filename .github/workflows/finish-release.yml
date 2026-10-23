@@ -65,8 +65,21 @@ jobs:
         run: |
           set -euo pipefail
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo 'Release already exists; refusing to overwrite it.'
-            exit 1
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > existing-release.json
+            python3 - <<'PYTHON'
+          import hashlib, json
+          from pathlib import Path
+          existing = json.load(open('existing-release.json'))
+          assert not existing['draft'], 'An unfinished draft requires review'
+          assets = {asset['name']: asset for asset in existing['assets']}
+          local = list(Path('release').iterdir())
+          assert set(assets) == {path.name for path in local}
+          for path in local:
+              assert assets[path.name]['size'] == path.stat().st_size
+              assert assets[path.name]['digest'] == 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()
+          print('The published release already contains these exact verified files.')
+          PYTHON
+            exit 0
           fi
           gh release create "$RELEASE_TAG" release/* --repo "$GITHUB_REPOSITORY" --verify-tag --title "OpenWrt Studio ${RELEASE_TAG#v}" --notes-file release-notes.txt --draft
           test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets | length')" = 3
