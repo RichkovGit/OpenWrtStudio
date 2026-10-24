@@ -14,4 +14,9 @@
   <Compile Include="../Services/SshService.cs" Link="SshService.cs" />
   <Compile Include="../Services/ShellHelper.cs" Link="ShellHelper.cs" />
  </ItemGroup>
+ <ItemGroup>
+  <EmbeddedResource Include="../Assets/Router/install_packages.sh" LogicalName="OpenWrtStudio.Router.install_packages.sh" />
+  <Compile Include="../Services/RouterPackageInstaller.cs" Link="RouterPackageInstaller.cs" />
+  <Compile Include="../Models/RouterCapability.cs" Link="RouterCapability.cs" />
+ </ItemGroup>
 </Project>

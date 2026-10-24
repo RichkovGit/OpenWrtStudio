@@ -1,18 +1,26 @@
 <div align="center">
 
-# 🌐 OpenWrt Studio (WrtPilot) v2.5.20 — кандидат с исправлением VPN
+# 🌐 OpenWrt Studio (WrtPilot)
 
 **Современный центр управления, глубокой настройки, мониторинга и автоматического устранения неполадок для роутеров OpenWrt.**
 
-[![Release](https://img.shields.io/badge/release-v2.5.19-blue.svg?style=flat-square)](https://github.com/RichkovGit/OpenWrtStudio/releases/tag/v2.5.19)
+[![Release](https://img.shields.io/badge/release-v2.5.21-blue.svg?style=flat-square)](https://github.com/RichkovGit/OpenWrtStudio/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011%20x64-0078D4.svg?style=flat-square)](https://github.com/RichkovGit/OpenWrtStudio/releases)
 [![Framework](https://img.shields.io/badge/.NET-8.0%20WPF-512BD4.svg?style=flat-square)](https://dotnet.microsoft.com/)
 [![OpenWrt](https://img.shields.io/badge/OpenWrt-SSH-2596be.svg?style=flat-square)](https://openwrt.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
 
-[📥 Установщик и Portable](#-загрузка-и-установка) • [📝 Изменения v2.5.19](RELEASE_NOTES.md) • [🚀 Возможности](#-ключевые-возможности) • [🛠️ Сборка из исходников](#-сборка-из-исходников)
+[📥 Установщик и Portable](#-загрузка-и-установка) • [📝 История изменений](RELEASE_NOTES.md) • [🚀 Возможности](#-ключевые-возможности) • [🛠️ Сборка из исходников](#-сборка-из-исходников)
 
 </div>
+
+## Скачать Windows-программу
+
+- [Установщик EXE — Windows x64](https://github.com/RichkovGit/OpenWrtStudio/releases/download/v2.5.21/OpenWrtStudio_Setup_v2.5.21.exe).
+- [Portable ZIP — Windows x64](https://github.com/RichkovGit/OpenWrtStudio/releases/download/v2.5.21/OpenWrtStudio_v2.5.21_Portable.zip).
+- [Все файлы последнего выпуска (Assets)](https://github.com/RichkovGit/OpenWrtStudio/releases/latest).
+
+На GitHub откройте **Releases → Assets**; EXE находится в Windows-репозитории. APK и Linux-пакеты находятся в отдельном [репозитории приложения](https://github.com/RichkovGit/OpenWrtStudio-Mobile/releases/latest).
 
 ---
 
@@ -20,7 +28,7 @@
 
 Удалены заранее заданные авто-группы, демонстрационные данные и случайные задержки. Имена и raw tag читаются из реальных кэшей ForkOP и Clash API. Активная политика секции отделена от вложенного пути маршрутизации; переключение подтверждается повторным чтением состояния. Сценарии проверяются общим с Android набором данных, основанным на схеме upstream ForkOP.
 
-Сборки кандидата Windows доступны в артефактах workflow Desktop build and tests. Linux x86_64 (AppImage и tar.gz) собирается из Flutter-приложения: [инструкция](https://github.com/RichkovGit/OpenWrtStudio-Mobile/blob/codex/fix-vpn-selection/LINUX_INSTALL.md). WPF-интерфейс Windows под Linux не переносится.
+Опубликованные установщик и Portable доступны в [Windows Releases](https://github.com/RichkovGit/OpenWrtStudio/releases/latest). Linux x86_64 (AppImage и tar.gz) собирается из Flutter-приложения: [инструкция](https://github.com/RichkovGit/OpenWrtStudio-Mobile/blob/main/LINUX_INSTALL.md). WPF-интерфейс Windows под Linux не переносится.
 
 ## 📖 О проекте
 
@@ -117,10 +125,10 @@
 
 ## 📥 Загрузка и установка
 
-В [релизе **v2.5.19**](https://github.com/RichkovGit/OpenWrtStudio/releases/tag/v2.5.19) используются автономные сборки для Windows 10/11 x64:
+В [последнем стабильном выпуске](https://github.com/RichkovGit/OpenWrtStudio/releases/latest) используются автономные сборки для Windows 10/11 x64:
 
-- **`OpenWrtStudio_Setup_v2.5.19.exe`** — установка для текущего пользователя в `%LOCALAPPDATA%\Programs\OpenWrt Studio`. Установщик предлагает ярлык рабочего стола и автозапуск в трее; оба пункта включаются по желанию.
-- **`OpenWrtStudio_v2.5.19_Portable.zip`** — распаковка в выбранную папку и запуск `OpenWrtStudio.exe`.
+- **`OpenWrtStudio_Setup_v2.5.21.exe`** — установка для текущего пользователя в `%LOCALAPPDATA%\Programs\OpenWrt Studio`. Установщик предлагает ярлык рабочего стола и автозапуск в трее; оба пункта включаются по желанию.
+- **`OpenWrtStudio_v2.5.21_Portable.zip`** — распаковка в выбранную папку и запуск `OpenWrtStudio.exe`.
 
 Скачайте нужный файл и `SHA256SUMS.txt` из одного релиза, проверьте SHA-256 и завершите прежнюю копию приложения через меню трея «Выход» перед заменой. Закрытие окна крестиком оставляет приложение работающим в трее.
 
@@ -133,8 +141,8 @@
 Контрольные суммы относятся к конкретному файлу и опубликованы в `SHA256SUMS.txt` рядом с файлами выпуска. Получить SHA-256 в PowerShell:
 
 ```powershell
-Get-FileHash -LiteralPath .\OpenWrtStudio_v2.5.19_Portable.zip -Algorithm SHA256
-Get-FileHash -LiteralPath .\OpenWrtStudio_Setup_v2.5.19.exe -Algorithm SHA256
+Get-FileHash -LiteralPath .\OpenWrtStudio_v2.5.21_Portable.zip -Algorithm SHA256
+Get-FileHash -LiteralPath .\OpenWrtStudio_Setup_v2.5.21.exe -Algorithm SHA256
 ```
 
 Сравните поле `Hash` со строкой соответствующего файла в `SHA256SUMS.txt`.
@@ -168,7 +176,7 @@ Get-FileHash -LiteralPath .\OpenWrtStudio_Setup_v2.5.19.exe -Algorithm SHA256
 
 4. **Создание Portable ZIP**:
    ```powershell
-   Compress-Archive -Path ./publish/* -DestinationPath ./OpenWrtStudio_v2.5.19_Portable.zip
+   Compress-Archive -Path ./publish/* -DestinationPath ./OpenWrtStudio_v2.5.21_Portable.zip
    ```
 
 Команды выполняются из корня репозитория: `OpenWrtStudio.csproj` расположен в корне, проект тестов — в `OpenWrtStudio.Tests`.
@@ -177,7 +185,7 @@ Get-FileHash -LiteralPath .\OpenWrtStudio_Setup_v2.5.19.exe -Algorithm SHA256
    ```powershell
    ./scripts/build-installer.ps1
    ```
-   Скрипт проверяет версию EXE, добавляет значок, лицензию и заметки о выпуске из репозитория и создаёт `installer_output/OpenWrtStudio_Setup_v2.5.19.exe`. Если компилятор находится вне стандартных папок, задайте `-CompilerPath 'C:\путь\ISCC.exe'`. Параметры `-PublishDirectory` и `-OutputDirectory` позволяют выбрать папки сборки. Скрипт не устанавливает инструменты автоматически. Источник установщика — [installer/setup.iss](installer/setup.iss).
+   Скрипт проверяет версию EXE, добавляет значок, лицензию и заметки о выпуске из репозитория и создаёт `installer_output/OpenWrtStudio_Setup_v2.5.21.exe`. Если компилятор находится вне стандартных папок, задайте `-CompilerPath 'C:\путь\ISCC.exe'`. Параметры `-PublishDirectory` и `-OutputDirectory` позволяют выбрать папки сборки. Скрипт не устанавливает инструменты автоматически. Источник установщика — [installer/setup.iss](installer/setup.iss).
 
 Для v2.5.19 прошли **124 теста без подключения к роутеру**, ещё 5 интеграционных проверок в обычном запуске отключены. Отдельно прошли **2 проверки чтения реального роутера**. Это проверка выбранных сценариев, а не всех сочетаний прошивок и оборудования.
 

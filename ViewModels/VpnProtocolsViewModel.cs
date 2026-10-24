@@ -289,18 +289,26 @@ public partial class VpnProtocolsViewModel : ObservableObject
     {
         if (cap == null || !_ssh.IsConnected || string.IsNullOrWhiteSpace(cap.InstallCommand)) return;
 
+        if (IsLoading) return;
         IsLoading = true;
         StatusMessage = $"Установка {cap.DisplayName}... Пожалуйста, подождите.";
-        var (code, outStr, err) = await _ssh.ExecuteCommandAsync(cap.InstallCommand, 60);
-        if (code == 0 || outStr.Contains("Installing") || outStr.Contains("Configuring"))
+        string message;
+        try
         {
-            StatusMessage = $"Пакеты для {cap.DisplayName} успешно установлены!";
+            var (code, outStr, err) = await _ssh.ExecuteCommandAsync(cap.InstallCommand, 240);
+            message = code == 0
+                ? $"Пакеты для {cap.DisplayName} установлены и проверены."
+                : $"Ошибка установки {cap.DisplayName} (код {code}):\n{err}\n{outStr}";
+            if (code == 0) await ScanCapabilitiesAsync();
         }
-        else
+        catch (Exception ex)
         {
-            StatusMessage = $"Ошибка установки {cap.DisplayName}: {err}\n{outStr}";
+            message = $"Не удалось подтвердить установку {cap.DisplayName}: {ex.Message}";
         }
-        IsLoading = false;
-        await ScanCapabilitiesAsync();
+        finally
+        {
+            IsLoading = false;
+        }
+        StatusMessage = message;
     }
 }
