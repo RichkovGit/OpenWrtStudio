@@ -29,7 +29,7 @@ public static class RouterPackageInstaller
         using var stream = typeof(RouterPackageInstaller).Assembly.GetManifestResourceStream("OpenWrtStudio.Router.install_packages.sh")
             ?? throw new InvalidOperationException("Package installer resource is missing");
         using var reader = new StreamReader(stream);
-        return "/bin/sh -c " + ShellHelper.EscapeArg(reader.ReadToEnd()) + " -- "
+        return "/bin/sh -c " + ShellHelper.EscapeArg(reader.ReadToEnd().Replace("\r\n", "\n")) + " -- "
             + string.Join(" ", groups.Select(g => ShellHelper.EscapeArg(string.Join(" ", g))));
     }
 }
