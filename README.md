@@ -1,10 +1,10 @@
 <div align="center">
 
-# 🌐 OpenWrt Studio (WrtPilot) v2.5.20 — кандидат с исправлением VPN
+# 🌐 OpenWrt Studio (WrtPilot)
 
 **Современный центр управления, глубокой настройки, мониторинга и автоматического устранения неполадок для роутеров OpenWrt.**
 
-[![Release](https://img.shields.io/badge/release-v2.5.19-blue.svg?style=flat-square)](https://github.com/RichkovGit/OpenWrtStudio/releases/tag/v2.5.19)
+[![Release](https://img.shields.io/badge/release-v2.5.21-blue.svg?style=flat-square)](https://github.com/RichkovGit/OpenWrtStudio/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011%20x64-0078D4.svg?style=flat-square)](https://github.com/RichkovGit/OpenWrtStudio/releases)
 [![Framework](https://img.shields.io/badge/.NET-8.0%20WPF-512BD4.svg?style=flat-square)](https://dotnet.microsoft.com/)
 [![OpenWrt](https://img.shields.io/badge/OpenWrt-SSH-2596be.svg?style=flat-square)](https://openwrt.org/)
@@ -13,6 +13,14 @@
 [📥 Установщик и Portable](#-загрузка-и-установка) • [📝 Изменения v2.5.19](RELEASE_NOTES.md) • [🚀 Возможности](#-ключевые-возможности) • [🛠️ Сборка из исходников](#-сборка-из-исходников)
 
 </div>
+
+## Скачать Windows-программу
+
+- [Установщик EXE — Windows x64](https://github.com/RichkovGit/OpenWrtStudio/releases/download/v2.5.21/OpenWrtStudio_Setup_v2.5.21.exe).
+- [Portable ZIP — Windows x64](https://github.com/RichkovGit/OpenWrtStudio/releases/download/v2.5.21/OpenWrtStudio_v2.5.21_Portable.zip).
+- [Все файлы последнего выпуска (Assets)](https://github.com/RichkovGit/OpenWrtStudio/releases/latest).
+
+На GitHub откройте **Releases → Assets**; EXE находится в Windows-репозитории. APK и Linux-пакеты находятся в отдельном [репозитории приложения](https://github.com/RichkovGit/OpenWrtStudio-Mobile/releases/latest).
 
 ---
 
@@ -117,7 +125,7 @@
 
 ## 📥 Загрузка и установка
 
-В [релизе **v2.5.19**](https://github.com/RichkovGit/OpenWrtStudio/releases/tag/v2.5.19) используются автономные сборки для Windows 10/11 x64:
+В [релизе **v2.5.19**](https://github.com/RichkovGit/OpenWrtStudio/releases/latest) используются автономные сборки для Windows 10/11 x64:
 
 - **`OpenWrtStudio_Setup_v2.5.19.exe`** — установка для текущего пользователя в `%LOCALAPPDATA%\Programs\OpenWrt Studio`. Установщик предлагает ярлык рабочего стола и автозапуск в трее; оба пункта включаются по желанию.
 - **`OpenWrtStudio_v2.5.19_Portable.zip`** — распаковка в выбранную папку и запуск `OpenWrtStudio.exe`.
