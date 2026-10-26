@@ -1,0 +1,4 @@
+#!/bin/sh
+uci -q set luci.themes.OpenWrtStudio='/luci-static/studio'
+uci commit luci
+exit 0

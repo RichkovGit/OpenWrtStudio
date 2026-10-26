@@ -1,0 +1,101 @@
+"use strict";
+"require view";
+"require rpc";
+var status = rpc.declare({ object: "studio", method: "status", expect: {} });
+return view.extend({
+  load: function () {
+    return status();
+  },
+  render: function (data) {
+    var groups = [
+      [
+        "Сеть и устройства",
+        [
+          ["Wi-Fi: SSID, пароль, WPA2/WPA3", "admin/network/wireless"],
+          ["WAN / LAN / WireGuard / AmneziaWG", "admin/network/network"],
+          ["DHCP и статические аренды", "admin/network/dhcp"],
+          ["Брандмауэр, ограничения клиентов", "admin/network/firewall"],
+          ["Проброс портов", "admin/network/firewall/forwards"],
+          ["Статические маршруты", "admin/network/routing"],
+        ],
+      ],
+      [
+        "Система",
+        [
+          ["Имя роутера, время и тема", "admin/system/system"],
+          ["Пароль администратора и SSH", "admin/system/admin"],
+          ["Резервная копия и прошивка", "admin/system/flash"],
+          ["Планировщик cron", "admin/system/crontab"],
+          ["Пакеты и источники ForkOP", "admin/system/opkg"],
+          ["Службы и автозапуск", "admin/system/startup"],
+          ["Перезагрузка", "admin/system/reboot"],
+          ["USB и точки монтирования (luci-app-mount)", "admin/system/mounts"],
+        ],
+      ],
+    ];
+    return E("div", {}, [
+      E("h2", {}, "Настройки и инструменты"),
+      E(
+        "p",
+        {},
+        "Штатные формы LuCI работают с UCI, проверкой полей и подтверждением применения. Для WireGuard нужен luci-proto-wireguard, для AmneziaWG — совместимый модуль вашей прошивки. Источники ForkOP добавляются для конкретной версии OpenWrt и архитектуры.",
+      ),
+      E(
+        "div",
+        { class: "studio-grid" },
+        groups.map(function (g) {
+          return E("div", { class: "studio-card" }, [
+            E("h3", {}, g[0]),
+            E(
+              "div",
+              { class: "studio-links" },
+              g[1].map(function (link) {
+                return E("a", { href: L.url(link[1]) }, link[0]);
+              }),
+            ),
+          ]);
+        }),
+      ),
+      E("div", { class: "studio-card" }, [
+        E("h3", {}, "ForkOP · источник для архитектуры"),
+        E(
+          "p",
+          {},
+          "Архитектура: " +
+            (data.architecture || "не определена") +
+            ". Сверьте поддержку вашей версии OpenWrt и ключ подписи в документации источника перед добавлением.",
+        ),
+        E(
+          "pre",
+          {},
+          /^[a-zA-Z0-9_]+$/.test(data.architecture || "")
+            ? "src/gz forkop https://raw.githubusercontent.com/forkop/openwrt-packages/master/" +
+                data.architecture
+            : "Невозможно предложить источник без архитектуры.",
+        ),
+        E(
+          "a",
+          { href: L.url("admin/system/opkg") },
+          "Открыть каталог и настройки источников",
+        ),
+      ]),
+      E("div", { class: "studio-card" }, [
+        E("h3", {}, "Шаблоны cron"),
+        E(
+          "p",
+          {},
+          "Добавляйте задания в системный планировщик после проверки времени роутера. Выберите только нужные строки.",
+        ),
+        E(
+          "pre",
+          {},
+          "0 4 * * * /sbin/reboot\n0 1 * * * /sbin/wifi down\n0 7 * * * /sbin/wifi up\n0 */6 * * * /etc/init.d/mihomo reload",
+        ),
+        E("a", { href: L.url("admin/system/crontab") }, "Открыть планировщик"),
+      ]),
+    ]);
+  },
+  handleSaveApply: null,
+  handleSave: null,
+  handleReset: null,
+});
