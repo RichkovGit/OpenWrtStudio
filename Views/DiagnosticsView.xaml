@@ -35,8 +35,12 @@
                                     <TextBlock Text="Автоматическая диагностика" FontSize="18" FontWeight="SemiBold" />
                                     <TextBlock Text="{Binding AuditSummary}" Margin="0,4,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                 </StackPanel>
-                                <ui:Button Grid.Column="1" Appearance="Primary" Icon="{ui:SymbolIcon Stethoscope24}" 
-                                           Content="Запустить аудит" Command="{Binding RunHealthAuditCommand}" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon Copy24}" 
+                                               Content="Копировать отчёт" Command="{Binding CopyDiagnosticReportCommand}" Margin="0,0,8,0" />
+                                    <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Stethoscope24}" 
+                                               Content="Запустить аудит" Command="{Binding RunHealthAuditCommand}" />
+                                </StackPanel>
                             </Grid>
                         </ui:Card>
 
@@ -84,6 +88,69 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+
+                        <!-- Sentinel: авто-восстановление одним кликом -->
+                        <ui:Card Margin="0,16,0,0">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Sentinel — исправление одним кликом" FontSize="18" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding FixAllStatus}" Margin="0,4,0,0" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Content="Проверить здоровье"
+                                                   Command="{Binding RefreshSentinelCommand}" Margin="0,0,8,0" />
+                                        <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Wrench24}" Content="Исправить всё одним кликом"
+                                                   Command="{Binding FixAllCommand}" IsEnabled="{Binding CanFixAll}"
+                                                   Visibility="{Binding HasActiveIssue, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,0,8,0" />
+                                        <ui:Button Appearance="Danger" Icon="{ui:SymbolIcon DismissCircle24}" Content="Отменить"
+                                                   Command="{Binding CancelFixAllCommand}"
+                                                   Visibility="{Binding IsFixingAll, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Border Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12,8" Margin="0,12,0,0"
+                                        Visibility="{Binding HasActiveIssue, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding ActiveIssue.Title}" FontWeight="Bold" Foreground="#EF4444" />
+                                        <TextBlock Text="{Binding ActiveIssue.Description}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Text="{Binding ActiveIssue.ProviderStatusText}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                                   Foreground="#F59E0B" FontSize="12" />
+                                    </StackPanel>
+                                </Border>
+
+                                <ItemsControl ItemsSource="{Binding FixAllSteps}" Margin="0,12,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <ui:SymbolIcon Symbol="{Binding Success, Converter={StaticResource BoolToFixStepIconConverter}}"
+                                                               FontSize="16" Margin="0,0,8,0" VerticalAlignment="Top" />
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="{Binding MethodName}" FontWeight="Medium" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding Message}" FontSize="12" TextWrapping="Wrap"
+                                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <TextBox Text="{Binding FixAllReportText, Mode=OneWay}" Margin="0,8,0,0"
+                                         FontFamily="Consolas" FontSize="12" IsReadOnly="True" TextWrapping="Wrap"
+                                         MaxHeight="180" VerticalScrollBarVisibility="Auto"
+                                         Visibility="{Binding FixAllReportText, Converter={StaticResource StringNotEmptyToVisibilityConverter}}" />
+                            </StackPanel>
+                        </ui:Card>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

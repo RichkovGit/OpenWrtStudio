@@ -148,13 +148,16 @@ public partial class ClientsViewModel : ObservableObject
         StatusMessage = $"Сброс соединения для {client.DisplayName}...";
         var res = await _clientManager.KickClientAsync(client.MacAddress);
         StatusMessage = res.Message;
-        client.IsOnline = false;
-        OnlineCount = Clients.Count(x => x.IsOnline);
-        OfflineCount = Clients.Count(x => !x.IsOnline);
-        Wifi5Count = Clients.Count(x => x.IsOnline && x.Band == "5 GHz");
-        Wifi24Count = Clients.Count(x => x.IsOnline && x.Band == "2.4 GHz");
-        LanCount = Clients.Count(x => x.IsOnline && x.Band == "LAN");
-        ApplyFilter();
+        if (res.Success)
+        {
+            client.IsOnline = false;
+            OnlineCount = Clients.Count(x => x.IsOnline);
+            OfflineCount = Clients.Count(x => !x.IsOnline);
+            Wifi5Count = Clients.Count(x => x.IsOnline && x.Band == "5 GHz");
+            Wifi24Count = Clients.Count(x => x.IsOnline && x.Band == "2.4 GHz");
+            LanCount = Clients.Count(x => x.IsOnline && x.Band == "LAN");
+            ApplyFilter();
+        }
         await Task.Delay(2500);
         await LoadClientsAsync();
     }
@@ -168,9 +171,12 @@ public partial class ClientsViewModel : ObservableObject
         
         var res = await _clientManager.BlockClientInternetAsync(client.MacAddress, nextBlock);
         StatusMessage = res.Message;
-        client.IsBlocked = nextBlock;
-        BlockedCount = Clients.Count(x => x.IsBlocked);
-        ApplyFilter();
+        if (res.Success)
+        {
+            client.IsBlocked = nextBlock;
+            BlockedCount = Clients.Count(x => x.IsBlocked);
+            ApplyFilter();
+        }
     }
 
     [RelayCommand]

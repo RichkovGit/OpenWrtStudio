@@ -12,9 +12,9 @@
     <SelfContained>true</SelfContained>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-    <Version>2.5.21</Version>
-    <AssemblyVersion>2.5.21.0</AssemblyVersion>
-    <FileVersion>2.5.21.0</FileVersion>
+    <Version>2.5.22</Version>
+    <AssemblyVersion>2.5.22.0</AssemblyVersion>
+    <FileVersion>2.5.22.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,6 +23,13 @@
     <EmbeddedResource Remove="OpenWrtStudio.Tests\**\*" />
     <None Remove="OpenWrtStudio.Tests\**\*" />
     <Page Remove="OpenWrtStudio.Tests\**\*.xaml" />
+    <!-- The work/ tree holds full project copies (snapshots, QA profiles); never compile them into the app. -->
+    <Compile Remove="work\**\*.cs" />
+    <EmbeddedResource Remove="work\**\*" />
+    <None Remove="work\**\*" />
+    <Page Remove="work\**\*.xaml" />
+    <ApplicationDefinition Remove="work\**\App.xaml" />
+    <Resource Remove="work\**\*" />
     <Resource Include="Assets\app.ico" />
     <Resource Include="Assets\app.png" />
   </ItemGroup>

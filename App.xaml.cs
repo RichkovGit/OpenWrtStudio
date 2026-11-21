@@ -236,7 +236,8 @@ public partial class App : Application
         try
         {
             _serviceProvider.GetService<ISystemTrayManager>()?.Dispose();
-            _serviceProvider.GetService<IBackgroundMonitorService>()?.StopMonitoring();
+            (_serviceProvider.GetService<IBackgroundMonitorService>() as IDisposable)?.Dispose();
+            (_serviceProvider.GetService<ISshService>() as IDisposable)?.Dispose();
         }
         catch { }
         base.OnExit(e);

@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace OpenWrtStudio.Services;
@@ -43,6 +44,26 @@ public static class ShellHelper
     {
         return !string.IsNullOrWhiteSpace(name)
                && Regex.IsMatch(name, @"\A[a-zA-Z0-9_][a-zA-Z0-9_\-]{0,14}\z");
+    }
+
+    /// <summary>
+    /// Decodes a raw option value as printed by 'uci show': single-quoted with '\'' escapes
+    /// for embedded quotes, or a plain unquoted token.
+    /// </summary>
+    public static string DecodeUciValue(string? raw)
+    {
+        if (string.IsNullOrEmpty(raw)) return "";
+        var value = raw.Trim();
+        if (value.Length < 2 || value[0] != '\'') return value;
+        var decoded = new StringBuilder();
+        var quoted = false;
+        for (var i = 0; i < value.Length; i++)
+        {
+            if (value[i] == '\'') quoted = !quoted;
+            else if (!quoted && value[i] == '\\' && i + 1 < value.Length) decoded.Append(value[++i]);
+            else decoded.Append(value[i]);
+        }
+        return decoded.ToString();
     }
 
     /// <summary>

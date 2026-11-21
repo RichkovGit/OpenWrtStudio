@@ -18,6 +18,7 @@ public interface ISystemTrayManager
 public class SystemTrayManager : ISystemTrayManager, IDisposable
 {
     private TaskbarIcon? _taskbarIcon;
+    private System.Drawing.Icon? _ownedIcon;
     private Window? _mainWindow;
     private bool _isExplicitExit = false;
     private bool _hasShownMinimizeNotice = false;
@@ -40,13 +41,16 @@ public class SystemTrayManager : ISystemTrayManager, IDisposable
 
         _taskbarIcon = new TaskbarIcon();
 
-        // Load Icon
+        // Load Icon (dispose the previous owned icon so re-initialization does not leak GDI handles)
+        _ownedIcon?.Dispose();
+        _ownedIcon = null;
         try
         {
             var icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "app.ico");
             if (File.Exists(icoPath))
             {
-                _taskbarIcon.Icon = new System.Drawing.Icon(icoPath);
+                _ownedIcon = new System.Drawing.Icon(icoPath);
+                _taskbarIcon.Icon = _ownedIcon;
             }
             else
             {
@@ -154,7 +158,7 @@ public class SystemTrayManager : ISystemTrayManager, IDisposable
         if (_taskbarIcon == null) return;
         var text = $"OpenWrt Studio: {status}";
         if (text.Length > 63) text = text.Substring(0, 60) + "...";
-        Application.Current?.Dispatcher.Invoke(() =>
+        RunOnUi(() =>
         {
             if (_taskbarIcon != null) _taskbarIcon.ToolTipText = text;
         });
@@ -162,10 +166,17 @@ public class SystemTrayManager : ISystemTrayManager, IDisposable
 
     public void ShowBalloonTip(string title, string message, BalloonIcon icon = BalloonIcon.Info)
     {
-        Application.Current?.Dispatcher.Invoke(() =>
+        RunOnUi(() =>
         {
             _taskbarIcon?.ShowBalloonTip(title, message, icon);
         });
+    }
+
+    private static void RunOnUi(Action action)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.CheckAccess()) action();
+        else if (!dispatcher.HasShutdownStarted) dispatcher.BeginInvoke(action);
     }
 
     private void RestoreMainWindow()
@@ -223,5 +234,7 @@ public class SystemTrayManager : ISystemTrayManager, IDisposable
             _taskbarIcon.Dispose();
             _taskbarIcon = null;
         }
+        _ownedIcon?.Dispose();
+        _ownedIcon = null;
     }
 }

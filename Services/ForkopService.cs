@@ -260,34 +260,37 @@ nslookup rutracker.org 127.0.0.1 >/dev/null 2>&1 && echo 'blocked_dns:ok' || ech
                 foreach (var line in lines)
                 {
                     var trimmed = line.Trim();
+                    // Split into exactly two parts: subscription URLs contain '=' in query strings.
+                    var parts = trimmed.Split('=', 2);
+                    if (parts.Length != 2) continue;
+                    var val = parts[1].Trim('\'', '"', ' ');
                     if (trimmed.Contains(".enabled="))
                     {
-                        var val = trimmed.Split('=')[1].Trim('\'', '"', ' ');
                         section.IsEnabled = val == "1" || val.Equals("true", StringComparison.OrdinalIgnoreCase);
                     }
                     else if (trimmed.Contains(".name="))
                     {
-                        section.Name = trimmed.Split('=')[1].Trim('\'', '"', ' ');
+                        section.Name = val;
                     }
                     else if (trimmed.Contains(".action="))
                     {
-                        section.Action = trimmed.Split('=')[1].Trim('\'', '"', ' ');
+                        section.Action = val;
                     }
                     else if (trimmed.Contains(".interface="))
                     {
-                        section.SelectedInterface = trimmed.Split('=')[1].Trim('\'', '"', ' ');
+                        section.SelectedInterface = val;
                     }
                     else if (trimmed.Contains(".sub_url="))
                     {
-                        customSubs.Add(trimmed.Split('=')[1].Trim('\'', '"', ' '));
+                        customSubs.Add(val);
                     }
                     else if (trimmed.Contains(".conn_url="))
                     {
-                        customConns.Add(trimmed.Split('=')[1].Trim('\'', '"', ' '));
+                        customConns.Add(val);
                     }
                     else if (trimmed.Contains(".ruleset="))
                     {
-                        customRules.Add(trimmed.Split('=')[1].Trim('\'', '"', ' '));
+                        customRules.Add(val);
                     }
                 }
 
@@ -376,7 +379,8 @@ elif [ -x /etc/init.d/forkop ]; then
 fi
 ";
         var (code, outStr, err) = await _ssh.ExecuteCommandAsync(updateCmd, 40);
-        if (code == 0 || outStr.Contains("success") || outStr.Contains("ok") || string.IsNullOrWhiteSpace(err))
+        // An empty stderr does not prove success; a non-zero exit code is a failure.
+        if (code == 0)
         {
             return (true, "Подписки ForkOP успешно обновлены на роутере!");
         }

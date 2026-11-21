@@ -387,7 +387,7 @@ public class SshService : ISshService, IDisposable
                 var connectionInfo = CreateConnectionInfo(profile);
                 using var client = new SshClient(connectionInfo);
                 client.Connect();
-                var cmd = client.RunCommand("echo OK");
+                using var cmd = client.RunCommand("echo OK");
                 client.Disconnect();
 
                 if (cmd.ExitStatus == 0)

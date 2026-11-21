@@ -89,7 +89,7 @@ public class OnlinePackageSearchService : IOnlinePackageSearchService
             using var req = new HttpRequestMessage(HttpMethod.Get, ghUrl);
             req.Headers.Add("User-Agent", "OpenWrtStudio/2.0");
 
-            var resp = await _httpClient.SendAsync(req);
+            using var resp = await _httpClient.SendAsync(req);
             if (resp.IsSuccessStatusCode)
             {
                 var json = await resp.Content.ReadAsStringAsync();

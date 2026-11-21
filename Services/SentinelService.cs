@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Linq;
 using System.Windows.Threading;
 using OpenWrtStudio.Models;
 
@@ -17,6 +19,7 @@ public interface ISentinelService
 
     Task<SentinelIssue?> ProbeHealthAsync();
     Task<(bool Success, string Message)> ApplyRecoveryMethodAsync(RecoveryMethod method);
+    Task<SentinelFixAllReport> FixAllAsync(SentinelIssue issue, IProgress<SentinelFixProgress>? progress = null, CancellationToken cancellationToken = default);
 }
 
 public class SentinelService : ISentinelService
@@ -27,6 +30,8 @@ public class SentinelService : ISentinelService
     public bool IsMonitoring { get; set; } = true;
     public SentinelIssue? CurrentIssue { get; private set; }
     public event EventHandler<SentinelIssue?>? IssueChanged;
+    private int _probeBusy;
+    private int _fixAllRunning;
 
     public SentinelService(ISshService ssh)
     {
@@ -63,6 +68,21 @@ public class SentinelService : ISentinelService
             return null;
         }
 
+        // The watchdog timer, the background monitor and Fix-All can all request a probe.
+        // Never stack concurrent probes on the single SSH channel.
+        if (Interlocked.CompareExchange(ref _probeBusy, 1, 0) != 0) return CurrentIssue;
+        try
+        {
+            return await ProbeHealthCoreAsync();
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _probeBusy, 0);
+        }
+    }
+
+    private async Task<SentinelIssue?> ProbeHealthCoreAsync()
+    {
         const string probeScript = @"
 echo '===WAN_STATUS==='
 ubus call network.interface.wan status 2>/dev/null
@@ -420,13 +440,147 @@ echo '===TUN==='
         return (false, $"Ошибка выполнения: {err}");
     }
 
+    /// <summary>
+    /// One-click repair: runs every applicable recovery method in order, re-checking health
+    /// after each step, stopping early when the issue is gone. Reboot is always the last resort.
+    /// </summary>
+    public async Task<SentinelFixAllReport> FixAllAsync(SentinelIssue issue, IProgress<SentinelFixProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(issue);
+        var report = new SentinelFixAllReport();
+        if (Interlocked.CompareExchange(ref _fixAllRunning, 1, 0) != 0)
+        {
+            report.Summary = "Исправление уже выполняется. Дождитесь завершения текущего запуска.";
+            return report;
+        }
+
+        try
+        {
+            if (!_ssh.IsConnected)
+            {
+                report.Summary = "Нет подключения по SSH — автоматическое исправление невозможно.";
+                return report;
+            }
+
+            var methods = issue.RecoveryMethods ?? new List<RecoveryMethod>();
+            if (methods.Count == 0)
+            {
+                report.Summary = "Для этой проблемы нет методов автоматического восстановления.";
+                return report;
+            }
+
+            static bool IsReboot(RecoveryMethod m) =>
+                m.Command.Trim().Equals("reboot", StringComparison.OrdinalIgnoreCase);
+
+            // Reboot drops the SSH session, so softer methods must always run first.
+            var ordered = methods.Where(m => !IsReboot(m)).Concat(methods.Where(IsReboot)).ToList();
+            var total = ordered.Count;
+
+            for (var i = 0; i < ordered.Count; i++)
+            {
+                var method = ordered[i];
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    report.Cancelled = true;
+                    break;
+                }
+
+                progress?.Report(new SentinelFixProgress
+                {
+                    StepIndex = i + 1,
+                    TotalSteps = total,
+                    MethodName = method.Name,
+                    Status = "Выполняется..."
+                });
+
+                var step = new SentinelFixStepResult { MethodId = method.Id, MethodName = method.Name };
+                try
+                {
+                    if (IsReboot(method))
+                    {
+                        var (code, _, err) = await _ssh.ExecuteCommandAsync(method.Command, 10);
+                        step.Success = code == 0;
+                        step.Message = code == 0
+                            ? "Команда перезагрузки отправлена. Роутер перезагружается — переподключитесь через 1–2 минуты."
+                            : $"Ошибка выполнения: {err}";
+                        report.Steps.Add(step);
+                        progress?.Report(new SentinelFixProgress
+                        {
+                            StepIndex = i + 1, TotalSteps = total, MethodName = method.Name,
+                            Status = step.Success ? "Перезагрузка отправлена" : "Ошибка"
+                        });
+                        if (code == 0)
+                        {
+                            report.RebootIssued = true;
+                            break;
+                        }
+                        continue;
+                    }
+
+                    var (success, msg) = await ApplyRecoveryMethodAsync(method);
+                    step.Success = success;
+                    step.Message = msg;
+                    report.Steps.Add(step);
+                    progress?.Report(new SentinelFixProgress
+                    {
+                        StepIndex = i + 1, TotalSteps = total, MethodName = method.Name,
+                        Status = success ? "Успешно" : "Ошибка"
+                    });
+
+                    // ApplyRecoveryMethodAsync re-probes health after a successful command.
+                    if (success && CurrentIssue == null)
+                    {
+                        report.Resolved = true;
+                        break;
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    report.Cancelled = true;
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    step.Success = false;
+                    step.Message = $"Исключение при выполнении: {ex.Message}";
+                    report.Steps.Add(step);
+                }
+            }
+
+            if (cancellationToken.IsCancellationRequested) report.Cancelled = true;
+            report.Summary = BuildFixAllSummary(report);
+            return report;
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _fixAllRunning, 0);
+        }
+    }
+
+    private static string BuildFixAllSummary(SentinelFixAllReport report)
+    {
+        var ok = report.Steps.Count(s => s.Success);
+        var failed = report.Steps.Count(s => !s.Success);
+        if (report.Cancelled) return $"Исправление отменено пользователем (выполнено шагов: {report.Steps.Count}).";
+        if (report.Resolved) return $"Проблема устранена! Успешных шагов: {ok}.";
+        if (report.RebootIssued) return "Мягкие методы не помогли — отправлена команда перезагрузки роутера.";
+        return $"Связь не восстановлена автоматически. Успешных шагов: {ok}, с ошибкой: {failed}. Проверьте линию провайдера вручную.";
+    }
+
     private void SetCurrentIssue(SentinelIssue? issue)
     {
         CurrentIssue = issue;
-        App.Current?.Dispatcher?.Invoke(() =>
+        var dispatcher = App.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.CheckAccess())
         {
             IssueChanged?.Invoke(this, issue);
-        });
+        }
+        else if (!dispatcher.HasShutdownStarted)
+        {
+            // Non-blocking: a blocking Invoke from a thread-pool probe can deadlock
+            // against a UI thread that is waiting for SSH work.
+            dispatcher.BeginInvoke(() => IssueChanged?.Invoke(this, issue));
+        }
     }
 
     private static string ExtractSection(string text, string tag)

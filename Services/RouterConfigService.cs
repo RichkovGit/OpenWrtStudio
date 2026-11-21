@@ -352,6 +352,13 @@ public class RouterConfigService : IRouterConfigService
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
         if (!string.IsNullOrWhiteSpace(rule.SectionId) && !ShellHelper.IsValidUciSection(rule.SectionId))
             return (false, "Некорректная секция правила проброса портов");
+        if (!IsValidPort(rule.SrcPort) || !IsValidPort(rule.DestPort))
+            return (false, "Порты проброса должны быть числами от 1 до 65535");
+        if (!ShellHelper.IsValidIp(rule.DestIp))
+            return (false, "Некорректный IPv4-адрес назначения проброса");
+        var proto = rule.Proto?.Trim().ToLowerInvariant() ?? "";
+        if (proto != "tcp" && proto != "udp" && proto != "tcp udp" && proto != "udp tcp" && proto != "icmp" && proto != "all")
+            return (false, "Протокол проброса: tcp, udp, tcp udp, icmp или all");
 
         var sb = new StringBuilder();
         sb.AppendLine("set -e");
@@ -430,6 +437,9 @@ public class RouterConfigService : IRouterConfigService
         if (code == 0) return (true, "Системные параметры успешно обновлены!");
         return (false, $"Ошибка сохранения системы: {err}\n{outStr}");
     }
+
+    private static bool IsValidPort(string? port) =>
+        int.TryParse(port?.Trim(), out var p) && p is >= 1 and <= 65535;
 
     private static void AppendSet(StringBuilder script, string key, string value)
     {

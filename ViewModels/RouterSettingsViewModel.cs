@@ -117,6 +117,16 @@ public partial class RouterSettingsViewModel : ObservableObject
     public void AddStaticLease()
     {
         if (string.IsNullOrWhiteSpace(NewLeaseMac) || string.IsNullOrWhiteSpace(NewLeaseIp)) return;
+        if (!ShellHelper.IsValidMac(NewLeaseMac))
+        {
+            StatusMessage = "Некорректный MAC-адрес (формат AA:BB:CC:DD:EE:FF).";
+            return;
+        }
+        if (!ShellHelper.IsValidIp(NewLeaseIp))
+        {
+            StatusMessage = "Некорректный IPv4-адрес для статической аренды.";
+            return;
+        }
 
         StaticLeases.Add(new StaticDhcpLease
         {

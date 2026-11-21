@@ -202,15 +202,15 @@ public class RouterDiscoveryService : IRouterDiscoveryService
                 if (!ssh.IsConnected) return null;
 
                 // Read sysinfo
-                var modelCmd = ssh.RunCommand("cat /tmp/sysinfo/model 2>/dev/null || uname -m");
+                using var modelCmd = ssh.RunCommand("cat /tmp/sysinfo/model 2>/dev/null || uname -m");
                 var model = modelCmd.Result.Trim();
                 if (string.IsNullOrEmpty(model)) model = "OpenWrt Router";
 
-                var hostCmd = ssh.RunCommand("uci get system.@system[0].hostname 2>/dev/null || uname -n");
+                using var hostCmd = ssh.RunCommand("uci get system.@system[0].hostname 2>/dev/null || uname -n");
                 var hostname = hostCmd.Result.Trim();
                 if (string.IsNullOrEmpty(hostname)) hostname = "OpenWrt";
 
-                var releaseCmd = ssh.RunCommand("cat /etc/openwrt_release 2>/dev/null | grep DISTRIB_RELEASE | cut -d\"'\" -f2");
+                using var releaseCmd = ssh.RunCommand("cat /etc/openwrt_release 2>/dev/null | grep DISTRIB_RELEASE | cut -d\"'\" -f2");
                 var release = releaseCmd.Result.Trim();
 
                 ssh.Disconnect();

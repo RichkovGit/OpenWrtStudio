@@ -29,11 +29,14 @@ public class PackageManagerService : IPackageManagerService
     public PackageManagerService(ISshService ssh)
     {
         _ssh = ssh;
+        // A different router (or a reconnect) may use another package manager.
+        _ssh.ConnectionChanged += (_, _) => _detectedPm = null;
     }
 
     public async Task<string> DetectPackageManagerAsync()
     {
         if (_detectedPm != null && _ssh.IsConnected) return _detectedPm;
+        if (!_ssh.IsConnected) return "opkg";
 
         var (code, outStr, _) = await _ssh.ExecuteCommandAsync(
             "if command -v apk >/dev/null 2>&1; then echo 'apk'; elif command -v opkg >/dev/null 2>&1; then echo 'opkg'; else echo 'none'; fi", 5);

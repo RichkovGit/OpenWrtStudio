@@ -44,9 +44,10 @@ public class SingboxQuickConfig
     public int MixedPort { get; set; } = 2080;
     public string ServerAddress { get; set; } = "";
     public int ServerPort { get; set; } = 443;
-    public string Protocol { get; set; } = "vless"; // vless, hysteria2, shadowsocks, trojan
+    public string Protocol { get; set; } = "vless"; // vless, hysteria2, shadowsocks, trojan, tuic
     public string Uuid { get; set; } = "";
     public string Password { get; set; } = "";
+    public string Method { get; set; } = "aes-256-gcm"; // shadowsocks cipher
     public string Flow { get; set; } = "xtls-rprx-vision";
     public string ServerName { get; set; } = "www.microsoft.com";
     public string PublicKey { get; set; } = "";
@@ -65,6 +66,52 @@ public class OpenVpnClientConfig
     public string Password { get; set; } = "";
     public string RawOvpnContent { get; set; } = "";
     public bool AuthUserPass { get; set; } = false;
+}
+
+/// <summary>Standalone Shadowsocks / SS-2022 client (shadowsocks-rust sslocal).</summary>
+public class ShadowsocksConfig
+{
+    public string ServerAddress { get; set; } = "";
+    public int ServerPort { get; set; } = 8388;
+    public string Method { get; set; } = "2022-blake3-aes-128-gcm";
+    public string Password { get; set; } = "";
+    public string LocalAddress { get; set; } = "0.0.0.0";
+    public int SocksPort { get; set; } = 1080;
+    public int HttpPort { get; set; } = 3128;
+    public bool EnableHttp { get; set; } = true;
+    public string Mode { get; set; } = "tcp_and_udp"; // tcp_only, tcp_and_udp, udp_only
+}
+
+/// <summary>Standalone Hysteria2 client (apernet/hysteria v2, YAML config).</summary>
+public class Hysteria2Config
+{
+    public string ServerAddress { get; set; } = "";
+    public int ServerPort { get; set; } = 443;
+    public string Password { get; set; } = "";
+    public string Sni { get; set; } = "";
+    public bool Insecure { get; set; } = false;
+    public int UpMbps { get; set; } = 50;
+    public int DownMbps { get; set; } = 200;
+    public string LocalAddress { get; set; } = "0.0.0.0";
+    public int SocksPort { get; set; } = 1080;
+    public int HttpPort { get; set; } = 8080;
+    public bool EnableHttp { get; set; } = true;
+}
+
+/// <summary>Standalone TUIC v5 client (EAimTY tuic-client 1.x, JSON config).</summary>
+public class TuicConfig
+{
+    public string ServerAddress { get; set; } = "";
+    public int ServerPort { get; set; } = 443;
+    public string Uuid { get; set; } = "";
+    public string Password { get; set; } = "";
+    public string IpOverride { get; set; } = "";
+    public bool DisableSni { get; set; } = false;
+    public string CongestionControl { get; set; } = "bbr"; // bbr, cubic, new_reno
+    public string UdpRelayMode { get; set; } = "native"; // native, quic
+    public bool ZeroRttHandshake { get; set; } = false;
+    public string LocalAddress { get; set; } = "0.0.0.0";
+    public int LocalPort { get; set; } = 1080;
 }
 
 public class MeshVpnConfig

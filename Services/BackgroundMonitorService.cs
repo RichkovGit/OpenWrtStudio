@@ -21,6 +21,7 @@ public class BackgroundMonitorService : IBackgroundMonitorService, IDisposable
     private readonly INotificationService _notifications;
 
     private CancellationTokenSource? _cts;
+    private Task _workerTask = Task.CompletedTask;
     private readonly object _lifecycleLock = new();
     private readonly SemaphoreSlim _pollLock = new(1, 1);
     private bool _disposed;
@@ -78,7 +79,14 @@ public class BackgroundMonitorService : IBackgroundMonitorService, IDisposable
             _hasInitializedState = false;
             _cts = new CancellationTokenSource();
             var source = _cts;
-            _ = Task.Run(() => RunMonitoringAsync(source, intervalSeconds));
+            // A stopped worker may still be finishing an SSH poll that ignores cancellation.
+            // Chain the new loop behind it so two loops never poll at the same time.
+            var previous = _workerTask;
+            _workerTask = Task.Run(async () =>
+            {
+                try { await previous.ConfigureAwait(false); } catch { }
+                await RunMonitoringAsync(source, intervalSeconds).ConfigureAwait(false);
+            });
         }
     }
 

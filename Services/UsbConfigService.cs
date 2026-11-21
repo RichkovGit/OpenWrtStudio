@@ -216,7 +216,8 @@ public class UsbConfigService : IUsbConfigService
             var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
             foreach (var line in lines)
             {
-                var kv = line.Trim().Split('=');
+                // Split into exactly two parts: values such as passwords may contain '='.
+                var kv = line.Trim().Split('=', 2);
                 if (kv.Length == 2)
                 {
                     var key = kv[0].Replace("network.wwan.", "").Trim();
@@ -408,7 +409,8 @@ public class UsbConfigService : IUsbConfigService
         var uciScript =
             "EXISTING=$(uci show samba4 2>/dev/null | grep -F \".path=\" | grep -F " + escPath + " | cut -d. -f2 | head -n1); " +
             "if [ -z \"$EXISTING\" ]; then " +
-            "  SECTION=$(uci add samba4 sambashare); " +
+            // uci add returns a bare cfg id; every later 'uci set ${SECTION}.x' needs the package prefix.
+            "  SECTION=\"samba4.$(uci add samba4 sambashare)\"; " +
             "else " +
             "  SECTION=\"samba4.$EXISTING\"; " +
             "fi; " +

@@ -11,7 +11,7 @@
             <!-- Header -->
             <StackPanel Margin="0,0,0,20">
                 <TextBlock Text="VPN Протоколы &amp; Карта возможностей" FontSize="26" FontWeight="SemiBold" />
-                <TextBlock Text="Анализ установленных протоколов на роутере, полная настройка AmneziaWG (AWG), WireGuard, Sing-box, OpenVPN, Tailscale" 
+                <TextBlock Text="Анализ установленных протоколов на роутере, полная настройка AmneziaWG (AWG), WireGuard, Sing-box, OpenVPN, Tailscale, Shadowsocks, Hysteria2, TUIC" 
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,0" />
             </StackPanel>
 
@@ -96,7 +96,7 @@
                     <TextBlock Text="Конфигуратор протоколов" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,14" />
 
                     <!-- Protocol Tabs Selector -->
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                    <WrapPanel Margin="0,0,0,16">
                         <RadioButton Content="AmneziaWG (AWG)" GroupName="ProtocolTabsGroup"
                                      IsChecked="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0, Mode=TwoWay}"
                                      Margin="0,0,10,0" />
@@ -107,8 +107,17 @@
                                      IsChecked="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=2, Mode=TwoWay}"
                                      Margin="0,0,10,0" />
                         <RadioButton Content="Tailscale" GroupName="ProtocolTabsGroup"
-                                     IsChecked="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=3, Mode=TwoWay}" />
-                    </StackPanel>
+                                     IsChecked="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=3, Mode=TwoWay}"
+                                     Margin="0,0,10,0" />
+                        <RadioButton Content="Shadowsocks (SS-2022)" GroupName="ProtocolTabsGroup"
+                                     IsChecked="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=4, Mode=TwoWay}"
+                                     Margin="0,0,10,0" />
+                        <RadioButton Content="Hysteria2" GroupName="ProtocolTabsGroup"
+                                     IsChecked="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=5, Mode=TwoWay}"
+                                     Margin="0,0,10,0" />
+                        <RadioButton Content="TUIC v5" GroupName="ProtocolTabsGroup"
+                                     IsChecked="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=6, Mode=TwoWay}" />
+                    </WrapPanel>
 
                     <!-- TAB 0: AMNEZIAWG -->
                     <StackPanel Visibility="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToVisibilityConverter}, ConverterParameter=0}">
@@ -435,6 +444,209 @@
                         </StackPanel>
 
                         <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Play24}" Content="Запустить Tailscale" Command="{Binding ApplyTailscaleConfigCommand}" />
+                    </StackPanel>
+
+                    <!-- TAB 4: SHADOWSOCKS / SS-2022 (standalone) -->
+                    <StackPanel Visibility="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToVisibilityConverter}, ConverterParameter=4}">
+                        <TextBlock Text="Автономный Shadowsocks / SS-2022 (shadowsocks-rust, sslocal)" FontWeight="Bold" FontSize="15" Margin="0,0,0,4" />
+                        <TextBlock Text="Поднимает SOCKS5 и HTTP прокси на роутере. Пакет shadowsocks-rust-sslocal доступен в фидах ImmortalWrt / ForkOP. Для прозрачного перехвата всего трафика используйте Sing-box или Mihomo."
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12" />
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="Сервер (Host / IP)" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding ShadowsocksConfig.ServerAddress, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                <TextBlock Text="Порт" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding ShadowsocksConfig.ServerPort, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Метод шифрования" FontSize="11" Margin="0,0,0,2" />
+                                <ComboBox ItemsSource="{Binding ShadowsocksMethods}" SelectedItem="{Binding ShadowsocksConfig.Method, Mode=TwoWay}" IsEditable="True" />
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Margin="0,0,0,10">
+                            <TextBlock Text="Пароль (для SS-2022 — base64-ключ нужной длины)" FontSize="11" Margin="0,0,0,2" />
+                            <ui:TextBox Text="{Binding ShadowsocksConfig.Password, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="120" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="Локальный адрес (Listen)" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding ShadowsocksConfig.LocalAddress, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                <TextBlock Text="SOCKS-порт" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding ShadowsocksConfig.SocksPort, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="HTTP-порт" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding ShadowsocksConfig.HttpPort, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <CheckBox Content="Поднять также HTTP-прокси (local-http)" IsChecked="{Binding ShadowsocksConfig.EnableHttp}" Margin="0,0,0,14" />
+
+                        <StackPanel Orientation="Horizontal">
+                            <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Checkmark24}" Content="Развернуть Shadowsocks на роутере" Command="{Binding ApplyShadowsocksConfigCommand}" Margin="0,0,10,0" />
+                            <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Content="Проверить статус" Command="{Binding CheckStandaloneStatusCommand}" CommandParameter="shadowsocks" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- TAB 5: HYSTERIA2 (standalone) -->
+                    <StackPanel Visibility="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToVisibilityConverter}, ConverterParameter=5}">
+                        <TextBlock Text="Автономный Hysteria2 (ядро hysteria v2)" FontWeight="Bold" FontSize="15" Margin="0,0,0,4" />
+                        <TextBlock Text="QUIC-протокол с контролем перегрузки Brutal — устойчив к потерям и блокировкам UDP. Поднимает SOCKS5/HTTP прокси на роутере; конфиг /etc/hysteria/config.yaml."
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12" />
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="Сервер (Host / IP)" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding Hysteria2Config.ServerAddress, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                <TextBlock Text="Порт" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding Hysteria2Config.ServerPort, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="SNI (необязательно)" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding Hysteria2Config.Sni, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Margin="0,0,0,10">
+                            <TextBlock Text="Пароль (auth)" FontSize="11" Margin="0,0,0,2" />
+                            <ui:TextBox Text="{Binding Hysteria2Config.Password, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="120" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="Исходящая полоса (Мбит/с)" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding Hysteria2Config.UpMbps, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                <TextBlock Text="Входящая полоса (Мбит/с)" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding Hysteria2Config.DownMbps, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Margin="0,0,8,0">
+                                <TextBlock Text="SOCKS-порт" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding Hysteria2Config.SocksPort, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="3">
+                                <TextBlock Text="HTTP-порт" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding Hysteria2Config.HttpPort, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                            <CheckBox Content="Разрешить самоподписанный сертификат (insecure)" IsChecked="{Binding Hysteria2Config.Insecure}" Margin="0,0,16,0" />
+                            <CheckBox Content="Поднять также HTTP-прокси" IsChecked="{Binding Hysteria2Config.EnableHttp}" />
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal">
+                            <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Checkmark24}" Content="Развернуть Hysteria2 на роутере" Command="{Binding ApplyHysteria2ConfigCommand}" Margin="0,0,10,0" />
+                            <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Content="Проверить статус" Command="{Binding CheckStandaloneStatusCommand}" CommandParameter="hysteria2" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- TAB 6: TUIC v5 (standalone) -->
+                    <StackPanel Visibility="{Binding SelectedProtocolIndex, Converter={StaticResource IndexToVisibilityConverter}, ConverterParameter=6}">
+                        <TextBlock Text="Автономный TUIC v5 (ядро tuic-client)" FontWeight="Bold" FontSize="15" Margin="0,0,0,4" />
+                        <TextBlock Text="0-RTT QUIC-прокси с минимальной задержкой. Поднимает SOCKS5 на роутере; конфиг /etc/tuic/config.json. Требуется сервер TUIC v5 (tuic-server 1.x)."
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12" />
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="Сервер (Host / IP)" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding TuicConfig.ServerAddress, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                <TextBlock Text="Порт" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding TuicConfig.ServerPort, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Подмена IP сервера (необязательно)" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding TuicConfig.IpOverride, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="UUID пользователя" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding TuicConfig.Uuid, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Пароль" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding TuicConfig.Password, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="120" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="Контроль перегрузки" FontSize="11" Margin="0,0,0,2" />
+                                <ComboBox ItemsSource="{Binding TuicCongestionControls}" SelectedItem="{Binding TuicConfig.CongestionControl, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                <TextBlock Text="Режим UDP-реле" FontSize="11" Margin="0,0,0,2" />
+                                <ComboBox ItemsSource="{Binding TuicUdpRelayModes}" SelectedItem="{Binding TuicConfig.UdpRelayMode, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Margin="0,0,8,0">
+                                <TextBlock Text="Локальный адрес" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding TuicConfig.LocalAddress, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="3">
+                                <TextBlock Text="SOCKS-порт" FontSize="11" Margin="0,0,0,2" />
+                                <ui:TextBox Text="{Binding TuicConfig.LocalPort, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                            <CheckBox Content="Отключить SNI (disable_sni)" IsChecked="{Binding TuicConfig.DisableSni}" Margin="0,0,16,0" />
+                            <CheckBox Content="0-RTT рукопожатие (zero_rtt_handshake)" IsChecked="{Binding TuicConfig.ZeroRttHandshake}" />
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal">
+                            <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Checkmark24}" Content="Развернуть TUIC v5 на роутере" Command="{Binding ApplyTuicConfigCommand}" Margin="0,0,10,0" />
+                            <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Content="Проверить статус" Command="{Binding CheckStandaloneStatusCommand}" CommandParameter="tuic" />
+                        </StackPanel>
                     </StackPanel>
                 </StackPanel>
             </ui:Card>

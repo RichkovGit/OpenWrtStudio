@@ -20,7 +20,8 @@ public interface IClientManagerService
 public class ClientManagerService : IClientManagerService
 {
     private readonly ISshService _ssh;
-    private static readonly Dictionary<string, CachedDeviceInfo> _deviceCache = new(StringComparer.OrdinalIgnoreCase);
+    // Per-connection cache: devices remembered for one router must not leak into another.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CachedDeviceInfo> _deviceCache = new(StringComparer.OrdinalIgnoreCase);
 
     private class CachedDeviceInfo
     {
@@ -33,6 +34,10 @@ public class ClientManagerService : IClientManagerService
     public ClientManagerService(ISshService ssh)
     {
         _ssh = ssh;
+        _ssh.ConnectionChanged += (_, connected) =>
+        {
+            if (!connected) _deviceCache.Clear();
+        };
     }
 
     public async Task<List<NetworkClient>> GetClientsAsync()
@@ -589,12 +594,13 @@ echo '===SECTION:END==='
         var lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
         foreach (var line in lines)
         {
-            var m = Regex.Match(line, @"dhcp\.(@host\[\d+\]|[a-zA-Z0-9_-]+)\.(\w+)='?([^']*)'?");
+            // Capture the whole value: '([^']*)' truncates names at escaped quotes (John'\''s).
+            var m = Regex.Match(line, @"dhcp\.(@host\[\d+\]|[a-zA-Z0-9_-]+)\.(\w+)=(.*)$");
             if (m.Success)
             {
                 var sec = m.Groups[1].Value;
                 var opt = m.Groups[2].Value;
-                var val = m.Groups[3].Value;
+                var val = ShellHelper.DecodeUciValue(m.Groups[3].Value);
 
                 if (!dict.TryGetValue(sec, out var info))
                 {
@@ -656,7 +662,9 @@ done
 ";
 
         var (code, outStr, errStr) = await _ssh.ExecuteCommandAsync(cmd, 6);
-        return (code == 0, $"Сессия устройства {cleanMac} сброшена (деавторизация Wi-Fi)");
+        return code == 0
+            ? (true, $"Сессия устройства {cleanMac} сброшена (деавторизация Wi-Fi)")
+            : (false, $"Ошибка сброса сессии {cleanMac}: {errStr}");
     }
 
     public async Task<(bool Success, string Message)> BlockClientInternetAsync(string mac, bool block)
@@ -731,7 +739,9 @@ uci commit firewall
         }
 
         var (code, outStr, errStr) = await _ssh.ExecuteCommandAsync(cmd, 10);
-        return (code == 0, block ? $"Доступ в интернет (включая VPN/иностранный трафик) заблокирован для {validMac}" : $"Доступ в интернет разблокирован для {validMac}");
+        if (code != 0)
+            return (false, $"Ошибка {(block ? "блокировки" : "разблокировки")} доступа для {validMac}: {errStr}");
+        return (true, block ? $"Доступ в интернет (включая VPN/иностранный трафик) заблокирован для {validMac}" : $"Доступ в интернет разблокирован для {validMac}");
     }
 
     public async Task<(bool Success, string Message)> SetStaticLeaseAsync(string mac, string ip, string name)
@@ -758,7 +768,9 @@ uci commit dhcp
 /etc/init.d/dnsmasq reload
 ";
         var (code, outStr, errStr) = await _ssh.ExecuteCommandAsync(cmd, 10);
-        return (code == 0, $"Статический IP {validIp} успешно закреплён за {validMac}");
+        return code == 0
+            ? (true, $"Статический IP {validIp} успешно закреплён за {validMac}")
+            : (false, $"Ошибка закрепления статического IP за {validMac}: {errStr}");
     }
 
     public async Task<(bool Success, string Message)> DeleteStaticLeaseAsync(string mac)
@@ -775,6 +787,8 @@ uci commit dhcp
 /etc/init.d/dnsmasq reload
 ";
         var (code, outStr, errStr) = await _ssh.ExecuteCommandAsync(cmd, 10);
-        return (code == 0, $"Фиксация статического IP удалена для {validMac}");
+        return code == 0
+            ? (true, $"Фиксация статического IP удалена для {validMac}")
+            : (false, $"Ошибка удаления фиксации статического IP для {validMac}: {errStr}");
     }
 }

@@ -15,8 +15,27 @@ public partial class DiagnosticsViewModel : ObservableObject
 {
     private readonly IDiagnosticsService _diagService;
     private readonly ISshService _ssh;
+    private readonly ISentinelService _sentinel;
     private CancellationTokenSource? _pingCts;
     private CancellationTokenSource? _traceCts;
+    private CancellationTokenSource? _fixAllCts;
+
+    // --- Sentinel / авто-восстановление ---
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanFixAll))]
+    private SentinelIssue? _activeIssue;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanFixAll))]
+    private bool _isFixingAll;
+
+    [ObservableProperty] private string _fixAllStatus = "Sentinel следит за здоровьем роутера в фоне. Запустите проверку или исправьте всё одним кликом.";
+    [ObservableProperty] private string _fixAllReportText = "";
+    [ObservableProperty] private ObservableCollection<SentinelFixStepResult> _fixAllSteps = new();
+
+    public bool HasActiveIssue => ActiveIssue != null;
+    public bool CanFixAll => HasActiveIssue && !IsFixingAll;
+    partial void OnActiveIssueChanged(SentinelIssue? value) => OnPropertyChanged(nameof(HasActiveIssue));
 
     // --- Health Check / Доктор роутера ---
     [ObservableProperty]
@@ -95,17 +114,142 @@ public partial class DiagnosticsViewModel : ObservableObject
     [ObservableProperty]
     private bool _isExecutingTerminal;
 
-    public DiagnosticsViewModel(IDiagnosticsService diagService, ISshService ssh)
+    public DiagnosticsViewModel(IDiagnosticsService diagService, ISshService ssh, ISentinelService sentinel)
     {
         _diagService = diagService;
         _ssh = ssh;
+        _sentinel = sentinel;
         _ssh.ConnectionChanged += (s, connected) =>
         {
             if (connected)
             {
                 _ = LoadAvailableInterfacesAsync();
             }
+            else
+            {
+                ActiveIssue = null;
+            }
         };
+        _sentinel.IssueChanged += (s, issue) =>
+        {
+            ActiveIssue = _ssh.IsConnected ? issue : null;
+        };
+    }
+
+    [RelayCommand]
+    public async Task RefreshSentinelAsync()
+    {
+        if (!_ssh.IsConnected)
+        {
+            FixAllStatus = "Подключитесь к роутеру для проверки здоровья сети.";
+            return;
+        }
+        FixAllStatus = "Sentinel: проверка WAN, DNS и служб...";
+        var issue = await _sentinel.ProbeHealthAsync();
+        ActiveIssue = issue;
+        FixAllStatus = issue == null
+            ? "Sentinel: критических сбоев не обнаружено."
+            : $"Sentinel обнаружил проблему: {issue.Title}";
+    }
+
+    [RelayCommand]
+    public async Task FixAllAsync()
+    {
+        var issue = ActiveIssue;
+        if (issue == null || !_ssh.IsConnected || IsFixingAll) return;
+
+        var cts = new CancellationTokenSource();
+        System.Threading.Interlocked.Exchange(ref _fixAllCts, cts)?.Dispose();
+        IsFixingAll = true;
+        FixAllSteps.Clear();
+        FixAllReportText = "";
+        FixAllStatus = "Исправление: запуск методов восстановления...";
+
+        try
+        {
+            var progress = new ActionProgress<SentinelFixProgress>(p =>
+            {
+                FixAllStatus = $"Шаг {p.StepIndex}/{p.TotalSteps}: {p.MethodName} — {p.Status}";
+            });
+            var report = await _sentinel.FixAllAsync(issue, progress, cts.Token);
+            FixAllSteps = new ObservableCollection<SentinelFixStepResult>(report.Steps);
+            FixAllReportText = BuildFixAllReportText(report);
+            FixAllStatus = report.Summary;
+            if (report.Resolved) ActiveIssue = null;
+            else if (_ssh.IsConnected) ActiveIssue = _sentinel.CurrentIssue;
+        }
+        catch (OperationCanceledException)
+        {
+            FixAllStatus = "Исправление отменено пользователем.";
+        }
+        catch (Exception ex)
+        {
+            FixAllStatus = $"Ошибка исправления: {ex.Message}";
+        }
+        finally
+        {
+            IsFixingAll = false;
+            if (ReferenceEquals(_fixAllCts, cts)) _fixAllCts = null;
+            cts.Dispose();
+        }
+    }
+
+    [RelayCommand]
+    public void CancelFixAll()
+    {
+        try { _fixAllCts?.Cancel(); } catch (ObjectDisposedException) { }
+    }
+
+    internal static string BuildFixAllReportText(SentinelFixAllReport report)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Отчёт авто-исправления Sentinel");
+        sb.AppendLine(report.Summary);
+        foreach (var step in report.Steps)
+        {
+            sb.AppendLine($"{(step.Success ? "[OK]" : "[ОШИБКА]")} {step.MethodName}: {step.Message}");
+        }
+        return sb.ToString();
+    }
+
+    internal static string BuildAuditReportText(IEnumerable<HealthCheckItem> items, string auditSummary)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Отчёт диагностики OpenWrt Studio");
+        sb.AppendLine($"Время: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine(auditSummary);
+        sb.AppendLine();
+        foreach (var item in items)
+        {
+            sb.AppendLine($"[{item.Status}] {item.Title} ({item.Category}): {item.StatusText}");
+            if (!string.IsNullOrWhiteSpace(item.Description)) sb.AppendLine($"    {item.Description}");
+            if (!string.IsNullOrWhiteSpace(item.Recommendation)) sb.AppendLine($"    Совет: {item.Recommendation}");
+        }
+        return sb.ToString();
+    }
+
+    [RelayCommand]
+    public void CopyDiagnosticReport()
+    {
+        try
+        {
+            var text = BuildAuditReportText(HealthItems, AuditSummary);
+            if (!string.IsNullOrWhiteSpace(FixAllReportText))
+                text += Environment.NewLine + FixAllReportText;
+            System.Windows.Clipboard.SetText(text);
+            FixAllStatus = "Отчёт диагностики скопирован в буфер обмена.";
+        }
+        catch (Exception ex)
+        {
+            FixAllStatus = $"Не удалось скопировать отчёт: {ex.Message}";
+        }
+    }
+
+    private sealed class ActionProgress<T> : IProgress<T>
+    {
+        private readonly Action<T> _action;
+        public ActionProgress(Action<T> action) => _action = action;
+        public void Report(T value) => _action(value);
     }
 
     partial void OnSelectedPingCountPresetChanged(string value)
@@ -213,7 +357,8 @@ public partial class DiagnosticsViewModel : ObservableObject
             : "";
         PingSummary = $"Отправка {countText} на {PingHost}{ifaceText}...";
 
-        _pingCts = new CancellationTokenSource();
+        var pingCts = new CancellationTokenSource();
+        System.Threading.Interlocked.Exchange(ref _pingCts, pingCts)?.Dispose();
         try
         {
             await _diagService.RunPingAsync(
@@ -235,7 +380,7 @@ public partial class DiagnosticsViewModel : ObservableObject
                         }
                     });
                 }, 
-                _pingCts.Token);
+                pingCts.Token);
 
             var successCount = PingResults.Count(p => p.Success);
             var loss = PingCount > 0 ? (PingCount - successCount) * 100.0 / PingCount : 0;
@@ -247,12 +392,14 @@ public partial class DiagnosticsViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            if (!_pingCts.IsCancellationRequested)
+            if (!pingCts.IsCancellationRequested)
                 PingSummary = $"Ошибка пинга: {ex.Message}";
         }
         finally
         {
             IsPinging = false;
+            if (ReferenceEquals(_pingCts, pingCts)) _pingCts = null;
+            pingCts.Dispose();
         }
     }
 
@@ -260,7 +407,7 @@ public partial class DiagnosticsViewModel : ObservableObject
     public void StopPing()
     {
         if (!IsPinging) return;
-        _pingCts?.Cancel();
+        try { _pingCts?.Cancel(); } catch (ObjectDisposedException) { }
         IsPinging = false;
 
         var successCount = PingResults.Count(p => p.Success);
@@ -285,7 +432,8 @@ public partial class DiagnosticsViewModel : ObservableObject
 
         IsTracing = true;
         TraceHops.Clear();
-        _traceCts = new CancellationTokenSource();
+        var traceCts = new CancellationTokenSource();
+        System.Threading.Interlocked.Exchange(ref _traceCts, traceCts)?.Dispose();
 
         try
         {
@@ -295,7 +443,7 @@ public partial class DiagnosticsViewModel : ObservableObject
                 {
                     TraceHops.Add(hop);
                 });
-            }, _traceCts.Token);
+            }, traceCts.Token);
         }
         catch (Exception ex)
         {
@@ -304,6 +452,8 @@ public partial class DiagnosticsViewModel : ObservableObject
         finally
         {
             IsTracing = false;
+            if (ReferenceEquals(_traceCts, traceCts)) _traceCts = null;
+            traceCts.Dispose();
         }
     }
 
@@ -311,7 +461,7 @@ public partial class DiagnosticsViewModel : ObservableObject
     public void StopTraceroute()
     {
         if (!IsTracing) return;
-        _traceCts?.Cancel();
+        try { _traceCts?.Cancel(); } catch (ObjectDisposedException) { }
         IsTracing = false;
 
         _ = Task.Run(async () =>

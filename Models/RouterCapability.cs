@@ -14,7 +14,9 @@ public enum VpnProtocolType
     Tailscale,
     ZeroTier,
     Shadowsocks,
-    Xray
+    Xray,
+    Hysteria2,
+    Tuic
 }
 
 public class VpnProtocolCapability

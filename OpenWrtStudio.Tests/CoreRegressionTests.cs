@@ -352,6 +352,7 @@ public class CoreRegressionTests
         public int ProbeCount { get; private set; }
         public Task<SentinelIssue?> ProbeHealthAsync() { ProbeCount++; return Task.FromResult<SentinelIssue?>(null); }
         public Task<(bool, string)> ApplyRecoveryMethodAsync(RecoveryMethod method) => Task.FromResult((true, ""));
+        public Task<SentinelFixAllReport> FixAllAsync(SentinelIssue issue, IProgress<SentinelFixProgress>? progress = null, CancellationToken cancellationToken = default) => Task.FromResult(new SentinelFixAllReport());
     }
 
     private sealed class FakeSsh : ISshService

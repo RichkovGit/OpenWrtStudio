@@ -42,7 +42,7 @@ if command -v apk >/dev/null 2>&1; then
     apk list -I 2>/dev/null || apk info -v 2>/dev/null
 fi
 echo '===BINARIES==='
-for b in forkop awg amneziawg-go wg sing-box mihomo clash passwall openvpn tailscale tailscaled zerotier zerotier-one xray xray-core; do
+for b in forkop awg amneziawg-go wg sing-box mihomo clash passwall openvpn tailscale tailscaled zerotier zerotier-one xray xray-core sslocal ss-redir ss-local hysteria tuic-client; do
     p=$(command -v ""$b"" 2>/dev/null || which ""$b"" 2>/dev/null)
     [ -n ""$p"" ] && echo ""$b:$p""
     [ -f ""/usr/bin/$b"" ] && echo ""$b:/usr/bin/$b""
@@ -263,7 +263,58 @@ ip link show 2>/dev/null || ifconfig 2>/dev/null
                 modCandidates: Array.Empty<string>(),
                 svcCandidates: new[] { "xray" },
                 cfgCandidates: new[] { "xray" },
-                runningCandidates: new[] { "xray" })
+                runningCandidates: new[] { "xray" }),
+
+            CreateCapability(
+                VpnProtocolType.Shadowsocks,
+                "Shadowsocks / SS-2022",
+                "Автономный клиент shadowsocks-rust (sslocal): SOCKS5/HTTP на роутере, шифры SS-2022",
+                "shadowsocks-rust-sslocal",
+                "/etc/shadowsocks-rust/config.json",
+                "ShieldKeyhole24",
+                "opkg update && opkg install shadowsocks-rust-sslocal || apk add shadowsocks-rust-sslocal",
+                hasObf: false,
+                pkgsSec, binSec, initSec, modSec, cfgSec, runningSec, ifaceSec,
+                pkgCandidates: new[] { "shadowsocks-rust-sslocal", "shadowsocks-rust", "shadowsocks-libev" },
+                binCandidates: new[] { "sslocal", "ss-redir", "ss-local" },
+                modCandidates: Array.Empty<string>(),
+                svcCandidates: new[] { "shadowsocks-rust", "shadowsocks-libev", "shadowsocks" },
+                cfgCandidates: new[] { "shadowsocks-rust", "shadowsocks-libev", "shadowsocks" },
+                runningCandidates: new[] { "sslocal", "ss-redir", "ss-local" }),
+
+            CreateCapability(
+                VpnProtocolType.Hysteria2,
+                "Hysteria2 (автономный)",
+                "QUIC-протокол с контролем перегрузки Brutal для нестабильных каналов, отдельное ядро hysteria",
+                "hysteria",
+                "/etc/hysteria/config.yaml",
+                "Flash24",
+                "opkg update && opkg install hysteria || apk add hysteria",
+                hasObf: true,
+                pkgsSec, binSec, initSec, modSec, cfgSec, runningSec, ifaceSec,
+                pkgCandidates: new[] { "hysteria" },
+                binCandidates: new[] { "hysteria" },
+                modCandidates: Array.Empty<string>(),
+                svcCandidates: new[] { "hysteria" },
+                cfgCandidates: new[] { "hysteria" },
+                runningCandidates: new[] { "hysteria" }),
+
+            CreateCapability(
+                VpnProtocolType.Tuic,
+                "TUIC v5 (автономный)",
+                "0-RTT QUIC-прокси с минимальной задержкой рукопожатия, отдельное ядро tuic-client",
+                "tuic-client",
+                "/etc/tuic/config.json",
+                "ArrowSync24",
+                "opkg update && opkg install tuic-client || apk add tuic-client",
+                hasObf: true,
+                pkgsSec, binSec, initSec, modSec, cfgSec, runningSec, ifaceSec,
+                pkgCandidates: new[] { "tuic-client", "tuic" },
+                binCandidates: new[] { "tuic-client", "tuic" },
+                modCandidates: Array.Empty<string>(),
+                svcCandidates: new[] { "tuic-client", "tuic" },
+                cfgCandidates: new[] { "tuic-client", "tuic" },
+                runningCandidates: new[] { "tuic-client", "tuic" })
         };
 
         return report;

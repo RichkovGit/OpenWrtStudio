@@ -348,17 +348,23 @@ public partial class MainViewModel : ObservableObject
         else if (!dispatcher.HasShutdownStarted) dispatcher.Invoke(action);
     }
 
+    private int _alertVersion;
+
     public void ShowAlert(string message, bool isError)
     {
         NotificationMessage = message;
         IsNotificationError = isError;
         ShowNotification = true;
 
+        var version = System.Threading.Interlocked.Increment(ref _alertVersion);
         Task.Delay(6000).ContinueWith(_ =>
         {
-            App.Current?.Dispatcher?.Invoke(() =>
+            var dispatcher = App.Current?.Dispatcher;
+            if (dispatcher == null || dispatcher.HasShutdownStarted) return;
+            dispatcher.BeginInvoke(() =>
             {
-                ShowNotification = false;
+                // Only the newest alert may auto-hide; an older timer must not clear a newer one.
+                if (version == System.Threading.Volatile.Read(ref _alertVersion)) ShowNotification = false;
             });
         });
     }

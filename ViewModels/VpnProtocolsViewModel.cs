@@ -38,6 +38,24 @@ public partial class VpnProtocolsViewModel : ObservableObject
     // --- Mesh VPN Parameters ---
     [ObservableProperty] private MeshVpnConfig _meshConfig = new();
 
+    // --- Standalone Protocols (Shadowsocks / Hysteria2 / TUIC) ---
+    [ObservableProperty] private ShadowsocksConfig _shadowsocksConfig = new();
+    [ObservableProperty] private Hysteria2Config _hysteria2Config = new();
+    [ObservableProperty] private TuicConfig _tuicConfig = new();
+
+    public List<string> ShadowsocksMethods { get; } = new()
+    {
+        "2022-blake3-aes-128-gcm",
+        "2022-blake3-aes-256-gcm",
+        "2022-blake3-chacha20-poly1305",
+        "aes-128-gcm",
+        "aes-256-gcm",
+        "chacha20-ietf-poly1305"
+    };
+
+    public List<string> TuicCongestionControls { get; } = new() { "bbr", "cubic", "new_reno" };
+    public List<string> TuicUdpRelayModes { get; } = new() { "native", "quic" };
+
     public VpnProtocolsViewModel(IRouterCapabilityService capService, IVpnProtocolService vpnService, ISshService ssh)
     {
         _capService = capService;
@@ -244,9 +262,16 @@ public partial class VpnProtocolsViewModel : ObservableObject
 
         if (dlg.ShowDialog() == true)
         {
-            OpenVpnConfig.RawOvpnContent = File.ReadAllText(dlg.FileName);
-            OpenVpnConfig.ProfileName = Path.GetFileNameWithoutExtension(dlg.FileName).ToLowerInvariant().Replace(" ", "_");
-            StatusMessage = $"Файл OpenVPN '{Path.GetFileName(dlg.FileName)}' готов к отправке!";
+            try
+            {
+                OpenVpnConfig.RawOvpnContent = File.ReadAllText(dlg.FileName);
+                OpenVpnConfig.ProfileName = Path.GetFileNameWithoutExtension(dlg.FileName).ToLowerInvariant().Replace(" ", "_");
+                StatusMessage = $"Файл OpenVPN '{Path.GetFileName(dlg.FileName)}' готов к отправке!";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Ошибка чтения файла: {ex.Message}";
+            }
         }
     }
 
@@ -282,6 +307,77 @@ public partial class VpnProtocolsViewModel : ObservableObject
         {
             await ScanCapabilitiesAsync();
         }
+    }
+
+    [RelayCommand]
+    public async Task ApplyShadowsocksConfigAsync()
+    {
+        if (!_ssh.IsConnected)
+        {
+            StatusMessage = "Нет подключения к роутеру!";
+            return;
+        }
+
+        IsLoading = true;
+        StatusMessage = "Развертывание автономного Shadowsocks (sslocal) на роутере...";
+        var (success, msg) = await _vpnService.ApplyShadowsocksConfigAsync(ShadowsocksConfig);
+        StatusMessage = msg;
+        IsLoading = false;
+        if (success) await ScanCapabilitiesAsync();
+    }
+
+    [RelayCommand]
+    public async Task ApplyHysteria2ConfigAsync()
+    {
+        if (!_ssh.IsConnected)
+        {
+            StatusMessage = "Нет подключения к роутеру!";
+            return;
+        }
+
+        IsLoading = true;
+        StatusMessage = "Развертывание автономного Hysteria2 на роутере...";
+        var (success, msg) = await _vpnService.ApplyHysteria2ConfigAsync(Hysteria2Config);
+        StatusMessage = msg;
+        IsLoading = false;
+        if (success) await ScanCapabilitiesAsync();
+    }
+
+    [RelayCommand]
+    public async Task ApplyTuicConfigAsync()
+    {
+        if (!_ssh.IsConnected)
+        {
+            StatusMessage = "Нет подключения к роутеру!";
+            return;
+        }
+
+        IsLoading = true;
+        StatusMessage = "Развертывание автономного TUIC v5 на роутере...";
+        var (success, msg) = await _vpnService.ApplyTuicConfigAsync(TuicConfig);
+        StatusMessage = msg;
+        IsLoading = false;
+        if (success) await ScanCapabilitiesAsync();
+    }
+
+    [RelayCommand]
+    public async Task CheckStandaloneStatusAsync(string? protocol)
+    {
+        if (!_ssh.IsConnected)
+        {
+            StatusMessage = "Нет подключения к роутеру!";
+            return;
+        }
+        var type = protocol?.ToLowerInvariant() switch
+        {
+            "shadowsocks" => VpnProtocolType.Shadowsocks,
+            "hysteria2" => VpnProtocolType.Hysteria2,
+            "tuic" => VpnProtocolType.Tuic,
+            _ => VpnProtocolType.SingBox
+        };
+        var (online, status) = await _vpnService.GetProtocolStatusAsync(type);
+        var running = status.Contains("running", StringComparison.OrdinalIgnoreCase);
+        StatusMessage = $"{protocol}: {(online && running ? "служба активна" : "служба не запущена")} ({status.Trim()}).";
     }
 
     [RelayCommand]

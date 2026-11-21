@@ -12,6 +12,7 @@
             <converters:HealthStatusToBrushConverter x:Key="HealthStatusToBrushConverter" />
             <converters:HealthStatusToIconConverter x:Key="HealthStatusToIconConverter" />
             <converters:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+            <converters:BoolToFixStepIconConverter x:Key="BoolToFixStepIconConverter" />
             <converters:IndexToBooleanConverter x:Key="IndexToBooleanConverter" />
             <converters:IndexToVisibilityConverter x:Key="IndexToVisibilityConverter" />
             <converters:BoolToStatusBrushConverter x:Key="BoolToStatusBrushConverter" />

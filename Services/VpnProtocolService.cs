@@ -19,6 +19,9 @@ public interface IVpnProtocolService
     Task<(bool Success, string Message)> ApplySingboxConfigAsync(SingboxQuickConfig config);
     Task<(bool Success, string Message)> ApplyOpenVpnConfigAsync(OpenVpnClientConfig config);
     Task<(bool Success, string Message)> ConfigureTailscaleAsync(MeshVpnConfig config);
+    Task<(bool Success, string Message)> ApplyShadowsocksConfigAsync(ShadowsocksConfig config);
+    Task<(bool Success, string Message)> ApplyHysteria2ConfigAsync(Hysteria2Config config);
+    Task<(bool Success, string Message)> ApplyTuicConfigAsync(TuicConfig config);
     Task<(bool Success, string Status)> GetProtocolStatusAsync(VpnProtocolType type);
 }
 
@@ -116,8 +119,9 @@ public class VpnProtocolService : IVpnProtocolService
             // Peer Section Resolution (handles standard LuCI, named peers, anonymous sections)
             string? peerSecId = null;
 
-            // 1. LuCI format: section containing .interface='<iface>'
-            var ifaceRefMatch = Regex.Match(uciOut, @$"network\.([^\s\.]+)\.interface='?{escIface}'?", RegexOptions.IgnoreCase);
+            // 1. LuCI format: section containing .interface='<iface>'.
+            // The terminator anchor keeps 'awg0' from matching a peer of 'awg01'.
+            var ifaceRefMatch = Regex.Match(uciOut, @$"network\.([^\s\.]+)\.interface='?{escIface}'?(?=[\s\r\n]|$)", RegexOptions.IgnoreCase);
             if (ifaceRefMatch.Success)
             {
                 peerSecId = ifaceRefMatch.Groups[1].Value;
@@ -504,6 +508,28 @@ public class VpnProtocolService : IVpnProtocolService
     {
         if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
 
+        var validationError = ValidateSingboxConfig(config);
+        if (validationError != null) return (false, validationError);
+
+        var inbound = config.InboundType.Equals("mixed", StringComparison.OrdinalIgnoreCase)
+            ? new Dictionary<string, object>
+            {
+                ["type"] = "mixed",
+                ["tag"] = "mixed-in",
+                ["listen"] = "0.0.0.0",
+                ["listen_port"] = config.MixedPort
+            }
+            : new Dictionary<string, object>
+            {
+                ["type"] = "tun",
+                ["tag"] = "tun-in",
+                ["interface_name"] = "singbox0",
+                ["inet4_address"] = "172.19.0.1/30",
+                ["auto_route"] = true,
+                ["strict_route"] = true,
+                ["sniff"] = true
+            };
+
         var root = new Dictionary<string, object>
         {
             ["log"] = new Dictionary<string, object>
@@ -519,19 +545,7 @@ public class VpnProtocolService : IVpnProtocolService
                     new Dictionary<string, object> { ["tag"] = "dns-direct", ["address"] = "77.88.8.8", ["detour"] = "direct" }
                 }
             },
-            ["inbounds"] = new List<object>
-            {
-                new Dictionary<string, object>
-                {
-                    ["type"] = "tun",
-                    ["tag"] = "tun-in",
-                    ["interface_name"] = "singbox0",
-                    ["inet4_address"] = "172.19.0.1/30",
-                    ["auto_route"] = true,
-                    ["strict_route"] = true,
-                    ["sniff"] = true
-                }
-            },
+            ["inbounds"] = new List<object> { inbound },
             ["outbounds"] = new List<object>
             {
                 CreateSingboxOutbound(config),
@@ -545,8 +559,36 @@ public class VpnProtocolService : IVpnProtocolService
         var (upSuccess, upMsg) = await _ssh.UploadFileContentAsync(json, "/etc/sing-box/config.json");
         if (!upSuccess) return (false, $"Не удалось записать /etc/sing-box/config.json: {upMsg}");
 
-        await _ssh.ExecuteCommandAsync("/etc/init.d/sing-box restart 2>/dev/null", 10);
+        var (code, _, err) = await _ssh.ExecuteCommandAsync("/etc/init.d/sing-box restart 2>/dev/null", 10);
+        if (code != 0)
+            return (false, $"Конфигурация сохранена в /etc/sing-box/config.json, но служба sing-box не перезапущена (проверьте, установлен ли пакет): {err}");
         return (true, "Конфигурация Sing-box успешно развернута и служба перезапущена!");
+    }
+
+    internal static string? ValidateSingboxConfig(SingboxQuickConfig config)
+    {
+        if (string.IsNullOrWhiteSpace(config.ServerAddress)) return "Укажите адрес сервера Sing-box";
+        if (config.ServerPort < 1 || config.ServerPort > 65535) return "Порт сервера должен быть в диапазоне 1–65535";
+        var protocol = config.Protocol?.Trim().ToLowerInvariant() ?? "";
+        switch (protocol)
+        {
+            case "vless":
+                if (string.IsNullOrWhiteSpace(config.Uuid)) return "Для VLESS укажите UUID";
+                break;
+            case "hysteria2":
+            case "trojan":
+            case "shadowsocks":
+                if (string.IsNullOrWhiteSpace(config.Password)) return $"Для {config.Protocol} укажите пароль";
+                if (protocol == "shadowsocks" && string.IsNullOrWhiteSpace(config.Method)) return "Для Shadowsocks укажите метод шифрования";
+                break;
+            case "tuic":
+                if (string.IsNullOrWhiteSpace(config.Uuid)) return "Для TUIC укажите UUID";
+                if (string.IsNullOrWhiteSpace(config.Password)) return "Для TUIC укажите пароль";
+                break;
+            default:
+                return $"Неизвестный протокол Sing-box: {config.Protocol}";
+        }
+        return null;
     }
 
     private static Dictionary<string, object> CreateSingboxOutbound(SingboxQuickConfig config)
@@ -585,6 +627,33 @@ public class VpnProtocolService : IVpnProtocolService
             {
                 ["enabled"] = true,
                 ["server_name"] = config.ServerName
+            };
+        }
+        else if (config.Protocol.Equals("shadowsocks", StringComparison.OrdinalIgnoreCase))
+        {
+            ob["method"] = config.Method;
+            ob["password"] = config.Password;
+        }
+        else if (config.Protocol.Equals("trojan", StringComparison.OrdinalIgnoreCase))
+        {
+            ob["password"] = config.Password;
+            ob["tls"] = new Dictionary<string, object>
+            {
+                ["enabled"] = true,
+                ["server_name"] = config.ServerName
+            };
+        }
+        else if (config.Protocol.Equals("tuic", StringComparison.OrdinalIgnoreCase))
+        {
+            ob["uuid"] = config.Uuid;
+            ob["password"] = config.Password;
+            ob["congestion_control"] = "bbr";
+            ob["udp_relay_mode"] = "native";
+            ob["tls"] = new Dictionary<string, object>
+            {
+                ["enabled"] = true,
+                ["server_name"] = config.ServerName,
+                ["alpn"] = new List<object> { "h3" }
             };
         }
 
@@ -636,6 +705,230 @@ uci commit openvpn
         return (false, $"Ошибка Tailscale: {err}\n{outStr}");
     }
 
+    // --- Standalone Shadowsocks / SS-2022 (shadowsocks-rust sslocal) ---
+
+    public static string GenerateShadowsocksConfigJson(ShadowsocksConfig config)
+    {
+        var locals = new List<object>
+        {
+            new Dictionary<string, object>
+            {
+                ["protocol"] = "socks",
+                ["local_address"] = config.LocalAddress,
+                ["local_port"] = config.SocksPort,
+                ["mode"] = config.Mode
+            }
+        };
+        if (config.EnableHttp)
+        {
+            locals.Add(new Dictionary<string, object>
+            {
+                ["protocol"] = "http",
+                ["local_address"] = config.LocalAddress,
+                ["local_port"] = config.HttpPort
+            });
+        }
+
+        var root = new Dictionary<string, object>
+        {
+            ["server"] = config.ServerAddress.Trim(),
+            ["server_port"] = config.ServerPort,
+            ["method"] = config.Method,
+            ["password"] = config.Password,
+            ["mode"] = config.Mode,
+            ["locals"] = locals
+        };
+        return JsonSerializer.Serialize(root, new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    internal static string? ValidateShadowsocksConfig(ShadowsocksConfig config)
+    {
+        if (string.IsNullOrWhiteSpace(config.ServerAddress)) return "Укажите адрес сервера Shadowsocks";
+        if (config.ServerPort < 1 || config.ServerPort > 65535) return "Порт сервера должен быть в диапазоне 1–65535";
+        if (string.IsNullOrWhiteSpace(config.Method)) return "Укажите метод шифрования (например 2022-blake3-aes-128-gcm)";
+        if (string.IsNullOrWhiteSpace(config.Password)) return "Укажите пароль Shadowsocks";
+        if (config.SocksPort < 1 || config.SocksPort > 65535) return "Локальный SOCKS-порт должен быть в диапазоне 1–65535";
+        if (config.EnableHttp && (config.HttpPort < 1 || config.HttpPort > 65535)) return "Локальный HTTP-порт должен быть в диапазоне 1–65535";
+        if (config.Mode != "tcp_only" && config.Mode != "tcp_and_udp" && config.Mode != "udp_only")
+            return "Режим: tcp_only, tcp_and_udp или udp_only";
+        return null;
+    }
+
+    public async Task<(bool Success, string Message)> ApplyShadowsocksConfigAsync(ShadowsocksConfig config)
+    {
+        if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
+        var error = ValidateShadowsocksConfig(config);
+        if (error != null) return (false, error);
+
+        return await DeployStandaloneProxyAsync(
+            "Shadowsocks (SS-2022)",
+            GenerateShadowsocksConfigJson(config),
+            "/etc/shadowsocks-rust/config.json",
+            "shadowsocks-rust",
+            "/usr/bin/sslocal -c /etc/shadowsocks-rust/config.json",
+            "sslocal");
+    }
+
+    // --- Standalone Hysteria2 (apernet/hysteria v2) ---
+
+    public static string GenerateHysteria2ConfigYaml(Hysteria2Config config)
+    {
+        static string Q(string value) => "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+        var sb = new StringBuilder();
+        sb.AppendLine("# Generated by OpenWrt Studio");
+        sb.AppendLine($"server: {Q($"{config.ServerAddress.Trim()}:{config.ServerPort}")}");
+        sb.AppendLine($"auth: {Q(config.Password)}");
+        sb.AppendLine("tls:");
+        if (!string.IsNullOrWhiteSpace(config.Sni)) sb.AppendLine($"  sni: {Q(config.Sni.Trim())}");
+        sb.AppendLine($"  insecure: {(config.Insecure ? "true" : "false")}");
+        sb.AppendLine("bandwidth:");
+        sb.AppendLine($"  up: {Q($"{config.UpMbps} mbps")}");
+        sb.AppendLine($"  down: {Q($"{config.DownMbps} mbps")}");
+        sb.AppendLine("socks5:");
+        sb.AppendLine($"  listen: {Q($"{config.LocalAddress}:{config.SocksPort}")}");
+        if (config.EnableHttp)
+        {
+            sb.AppendLine("http:");
+            sb.AppendLine($"  listen: {Q($"{config.LocalAddress}:{config.HttpPort}")}");
+        }
+        return sb.ToString();
+    }
+
+    internal static string? ValidateHysteria2Config(Hysteria2Config config)
+    {
+        if (string.IsNullOrWhiteSpace(config.ServerAddress)) return "Укажите адрес сервера Hysteria2";
+        if (config.ServerPort < 1 || config.ServerPort > 65535) return "Порт сервера должен быть в диапазоне 1–65535";
+        if (string.IsNullOrWhiteSpace(config.Password)) return "Укажите пароль Hysteria2 (auth)";
+        if (config.UpMbps <= 0 || config.DownMbps <= 0) return "Пропускная способность (up/down) должна быть больше 0 Мбит/с";
+        if (config.SocksPort < 1 || config.SocksPort > 65535) return "Локальный SOCKS-порт должен быть в диапазоне 1–65535";
+        if (config.EnableHttp && (config.HttpPort < 1 || config.HttpPort > 65535)) return "Локальный HTTP-порт должен быть в диапазоне 1–65535";
+        return null;
+    }
+
+    public async Task<(bool Success, string Message)> ApplyHysteria2ConfigAsync(Hysteria2Config config)
+    {
+        if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
+        var error = ValidateHysteria2Config(config);
+        if (error != null) return (false, error);
+
+        return await DeployStandaloneProxyAsync(
+            "Hysteria2",
+            GenerateHysteria2ConfigYaml(config),
+            "/etc/hysteria/config.yaml",
+            "hysteria",
+            "/usr/bin/hysteria client --config /etc/hysteria/config.yaml",
+            "hysteria");
+    }
+
+    // --- Standalone TUIC v5 (EAimTY tuic-client) ---
+
+    public static string GenerateTuicConfigJson(TuicConfig config)
+    {
+        var relay = new Dictionary<string, object>
+        {
+            ["server"] = $"{config.ServerAddress.Trim()}:{config.ServerPort}",
+            ["uuid"] = config.Uuid.Trim(),
+            ["password"] = config.Password,
+            ["udp_relay_mode"] = config.UdpRelayMode,
+            ["congestion_control"] = config.CongestionControl,
+            ["alpn"] = new List<object> { "h3" },
+            ["zero_rtt_handshake"] = config.ZeroRttHandshake,
+            ["disable_sni"] = config.DisableSni
+        };
+        if (!string.IsNullOrWhiteSpace(config.IpOverride)) relay["ip"] = config.IpOverride.Trim();
+
+        var root = new Dictionary<string, object>
+        {
+            ["relay"] = relay,
+            ["local"] = new Dictionary<string, object>
+            {
+                ["server"] = $"{config.LocalAddress}:{config.LocalPort}"
+            },
+            ["log_level"] = "info"
+        };
+        return JsonSerializer.Serialize(root, new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    internal static string? ValidateTuicConfig(TuicConfig config)
+    {
+        if (string.IsNullOrWhiteSpace(config.ServerAddress)) return "Укажите адрес сервера TUIC";
+        if (config.ServerPort < 1 || config.ServerPort > 65535) return "Порт сервера должен быть в диапазоне 1–65535";
+        if (string.IsNullOrWhiteSpace(config.Uuid)) return "Укажите UUID пользователя TUIC";
+        if (string.IsNullOrWhiteSpace(config.Password)) return "Укажите пароль TUIC";
+        if (config.CongestionControl != "bbr" && config.CongestionControl != "cubic" && config.CongestionControl != "new_reno")
+            return "Алгоритм перегрузки: bbr, cubic или new_reno";
+        if (config.UdpRelayMode != "native" && config.UdpRelayMode != "quic")
+            return "Режим UDP-реле: native или quic";
+        if (config.LocalPort < 1 || config.LocalPort > 65535) return "Локальный SOCKS-порт должен быть в диапазоне 1–65535";
+        if (!string.IsNullOrWhiteSpace(config.IpOverride) && !ShellHelper.IsValidIp(config.IpOverride))
+            return "Некорректный IP-адрес в поле подмены IP сервера";
+        return null;
+    }
+
+    public async Task<(bool Success, string Message)> ApplyTuicConfigAsync(TuicConfig config)
+    {
+        if (!_ssh.IsConnected) return (false, "Нет подключения к роутеру");
+        var error = ValidateTuicConfig(config);
+        if (error != null) return (false, error);
+
+        return await DeployStandaloneProxyAsync(
+            "TUIC v5",
+            GenerateTuicConfigJson(config),
+            "/etc/tuic/config.json",
+            "tuic-client",
+            "/usr/bin/tuic-client -c /etc/tuic/config.json",
+            "tuic-client");
+    }
+
+    /// <summary>
+    /// Shared deployment path for standalone proxy cores: upload the native config, create a
+    /// procd init script when the package ships only a binary, then enable/restart and verify.
+    /// </summary>
+    private async Task<(bool Success, string Message)> DeployStandaloneProxyAsync(
+        string displayName, string configContent, string configPath,
+        string serviceName, string command, string processName)
+    {
+        var (upSuccess, upMsg) = await _ssh.UploadFileContentAsync(configContent, configPath);
+        if (!upSuccess) return (false, $"Не удалось записать {configPath}: {upMsg}");
+
+        var (chkCode, chkOut, _) = await _ssh.ExecuteCommandAsync($"[ -f /etc/init.d/{serviceName} ] && echo exists || echo missing", 5);
+        if (chkCode == 0 && chkOut.Contains("missing"))
+        {
+            var initScript = BuildProcdInitScript(command);
+            var (initOk, initMsg) = await _ssh.UploadFileContentAsync(initScript, $"/etc/init.d/{serviceName}");
+            if (!initOk) return (false, $"Не удалось создать службу {serviceName}: {initMsg}");
+            await _ssh.ExecuteCommandAsync($"chmod +x /etc/init.d/{serviceName}", 5);
+        }
+
+        var (code, _, err) = await _ssh.ExecuteCommandAsync($"/etc/init.d/{serviceName} enable 2>/dev/null; /etc/init.d/{serviceName} restart", 15);
+        if (code != 0)
+            return (false, $"Конфигурация сохранена ({configPath}), но служба {serviceName} не запущена: {err}");
+
+        var (pidCode, pidOut, _) = await _ssh.ExecuteCommandAsync($"pidof {processName} 2>/dev/null", 5);
+        if (pidCode == 0 && !string.IsNullOrWhiteSpace(pidOut))
+            return (true, $"{displayName}: конфигурация развернута в {configPath}, служба запущена (PID: {pidOut.Trim()}).");
+        return (false, $"{displayName}: конфигурация сохранена, но процесс {processName} не найден после перезапуска. Проверьте параметры и журнал службы.");
+    }
+
+    internal static string BuildProcdInitScript(string command)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("#!/bin/sh /etc/rc.common");
+        sb.AppendLine("# Created by OpenWrt Studio");
+        sb.AppendLine("START=99");
+        sb.AppendLine("STOP=10");
+        sb.AppendLine("USE_PROCD=1");
+        sb.AppendLine("start_service() {");
+        sb.AppendLine("    procd_open_instance");
+        sb.AppendLine($"    procd_set_param command {command}");
+        sb.AppendLine("    procd_set_param respawn");
+        sb.AppendLine("    procd_set_param stdout 1");
+        sb.AppendLine("    procd_set_param stderr 1");
+        sb.AppendLine("    procd_close_instance");
+        sb.AppendLine("}");
+        return sb.ToString();
+    }
+
     public async Task<(bool Success, string Status)> GetProtocolStatusAsync(VpnProtocolType type)
     {
         if (!_ssh.IsConnected) return (false, "Офлайн");
@@ -652,6 +945,9 @@ uci commit openvpn
             VpnProtocolType.Tailscale => "tailscale status 2>/dev/null",
             VpnProtocolType.ZeroTier => "zerotier-cli status 2>/dev/null",
             VpnProtocolType.Xray => "pidof xray 2>/dev/null && echo 'running' || echo 'stopped'",
+            VpnProtocolType.Shadowsocks => "(pidof sslocal || pidof ss-redir || pidof ss-local) >/dev/null 2>&1 && echo 'running' || echo 'stopped'",
+            VpnProtocolType.Hysteria2 => "pidof hysteria >/dev/null 2>&1 && echo 'running' || echo 'stopped'",
+            VpnProtocolType.Tuic => "pidof tuic-client >/dev/null 2>&1 && echo 'running' || echo 'stopped'",
             _ => "echo 'unknown'"
         };
 
