@@ -1,32 +1,34 @@
 <div align="center">
 
-# 🌐 OpenWrt Studio (WrtPilot) v2.5.20 — кандидат с исправлением VPN
+# 🌐 OpenWrt Studio (WrtPilot) v2.5.22
 
 **Современный центр управления, глубокой настройки, мониторинга и автоматического устранения неполадок для роутеров OpenWrt.**
 
-[![Release](https://img.shields.io/badge/release-v2.5.19-blue.svg?style=flat-square)](https://github.com/RichkovGit/OpenWrtStudio/releases/tag/v2.5.19)
+[![Release](https://img.shields.io/badge/release-v2.5.22-blue.svg?style=flat-square)](https://github.com/RichkovGit/OpenWrtStudio/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011%20x64-0078D4.svg?style=flat-square)](https://github.com/RichkovGit/OpenWrtStudio/releases)
 [![Framework](https://img.shields.io/badge/.NET-8.0%20WPF-512BD4.svg?style=flat-square)](https://dotnet.microsoft.com/)
 [![OpenWrt](https://img.shields.io/badge/OpenWrt-SSH-2596be.svg?style=flat-square)](https://openwrt.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
 
-[📥 Установщик и Portable](#-загрузка-и-установка) • [📝 Изменения v2.5.19](RELEASE_NOTES.md) • [🚀 Возможности](#-ключевые-возможности) • [🛠️ Сборка из исходников](#-сборка-из-исходников)
+[📥 Установщик и Portable](#-загрузка-и-установка) • [📝 Изменения v2.5.22](RELEASE_NOTES.md) • [🚀 Возможности](#-ключевые-возможности) • [🛠️ Сборка из исходников](#-сборка-из-исходников)
 
 </div>
 
 ---
 
-## Исправление VPN в 2.5.20
+## Новое в 2.5.22
 
-Удалены заранее заданные авто-группы, демонстрационные данные и случайные задержки. Имена и raw tag читаются из реальных кэшей ForkOP и Clash API. Активная политика секции отделена от вложенного пути маршрутизации; переключение подтверждается повторным чтением состояния. Сценарии проверяются общим с Android набором данных, основанным на схеме upstream ForkOP.
+- **Три новых standalone-протокола**: Shadowsocks/SS-2022 (ядро shadowsocks-rust), Hysteria 2 и TUIC v5 — карта возможностей, конфигураторы с валидацией, установка, procd-init и честная проверка запуска. TUIC также добавлен как outbound в конфигуратор sing-box.
+- **«Исправить всё» одной кнопкой** в Sentinel: все методы восстановления выполняются последовательно с повторной проверкой после каждого шага, ранней остановкой при выздоровлении, отменой и отчётом; перезагрузка — строго последний метод. Отчёт диагностики можно скопировать в буфер.
+- **Исправлены десятки багов**: обрезание паролей/APN/URL с `=`, префиксный матч peer-интерфейсов AmneziaWG, битые outbound sing-box (shadowsocks/trojan), ложные «успехи» команд, утечки SSH/HTTP/GDI-ресурсов, гонки фонового мониторинга и кэшей между роутерами, deadlock-риск уведомлений.
 
-Сборки кандидата Windows доступны в артефактах workflow Desktop build and tests. Linux x86_64 (AppImage и tar.gz) собирается из Flutter-приложения: [инструкция](https://github.com/RichkovGit/OpenWrtStudio-Mobile/blob/codex/fix-vpn-selection/LINUX_INSTALL.md). WPF-интерфейс Windows под Linux не переносится.
+Linux x86_64 (AppImage и tar.gz) собирается из Flutter-приложения: [инструкция](https://github.com/RichkovGit/OpenWrtStudio-Mobile/blob/main/LINUX_INSTALL.md). WPF-интерфейс Windows под Linux не переносится.
 
 ## 📖 О проекте
 
 **OpenWrt Studio** — это автономное настольное Windows-приложение, созданное на стыке высоких технологий и максимального удобства («всё для людей»). Программа заменяет десятки разрозненных веб-страниц LuCI и терминальных команд единым, быстрым и красивым Fluent Design интерфейсом.
 
-Приложение позволяет настраивать Wi-Fi, интернет-соединения, правила брандмауэра, маршруты обхода блокировок, настраивать современные протоколы (AmneziaWG, Sing-box, Mihomo, WireGuard, Tailscale), внедрять подписки и автоматически восстанавливать доступ в интернет при сбоях.
+Приложение позволяет настраивать Wi-Fi, интернет-соединения, правила брандмауэра, маршруты обхода блокировок, настраивать современные протоколы (AmneziaWG, Sing-box, Mihomo, WireGuard, Tailscale, Shadowsocks/SS-2022, Hysteria 2, TUIC), внедрять подписки и автоматически восстанавливать доступ в интернет при сбоях.
 
 Доступность отдельных функций зависит от прошивки, архитектуры и установленных на роутере пакетов. Для работы нужны доступ по SSH и права на соответствующие настройки.
 
@@ -72,7 +74,7 @@
 
 ### 4. 🔍 Интерактивная «Карта возможностей» роутера
 * Динамическое сканирование установленных пакетов (`opkg list-installed`), сетевых интерфейсов (`ip link`) и процессов (`pidof`).
-* Интерактивная матрица статуса для 9 протоколов: **AmneziaWG, WireGuard, Sing-box, Mihomo, PassWall, OpenVPN, Tailscale, ZeroTier, Xray**.
+* Интерактивная матрица статуса для 12 протоколов: **AmneziaWG, WireGuard, Sing-box, Mihomo, PassWall, OpenVPN, Tailscale, ZeroTier, Xray, Shadowsocks/SS-2022, Hysteria 2, TUIC v5**.
 * Статусы: `Активен и работает`, `Установлен, но выключен`, `Не установлен` (с кнопкой быстрой установки).
 
 ### 5. 🛡️ Конфигураторы VPN-протоколов
@@ -84,6 +86,9 @@
   * В v2.5.19 исправлены IPv6 endpoint, применение DNS и проверка имени интерфейса.
 * **WireGuard**: классический конфигуратор ключей, эндпоинтов и маршрутов.
 * **Sing-box**: конфигуратор VLESS Reality / Hysteria 2 / TUIC с генерацией `config.json` и TUN-режимом.
+* **Shadowsocks/SS-2022** (standalone): ядро `shadowsocks-rust-sslocal`, JSON-конфиг с SOCKS/HTTP locals и современными шифрами SS-2022.
+* **Hysteria 2** (standalone): YAML-конфиг (server/auth/TLS/bandwidth/socks5/http) для QUIC-прокси на потерных сетях.
+* **TUIC v5** (standalone): JSON-конфиг строго по схеме upstream (`deny_unknown_fields`), 0-RTT TLS-рукопожатие.
 * **OpenVPN**: импорт `.ovpn` профилей и автонастройка клиента.
 * **Tailscale & ZeroTier**: ввод Auth-ключа, включение режима Exit-Node и анонс подсетей (Subnet Router).
 
@@ -108,6 +113,7 @@
   * **Сбой у провайдера**: обрыв физического кабеля или отказ сервера PPPoE провайдера.
   * **Сбой на роутере**: зависание локального DNS или сетевой службы.
 * 5 методов автоматического решения проблем в один клик.
+* **«Исправить всё» одной кнопкой**: последовательный запуск всех методов восстановления с повторной проверкой после каждого шага, ранней остановкой при выздоровлении, отменой и отчётом по шагам; перезагрузка роутера — строго последний метод.
 
 ### 9. 🎨 Темы оформления LuCI и Каталог пакетов
 * Установка тем интерфейса роутера: **Argon** (+ конфигуратор фонов и логотипов), **Edge**, **Material**, **OpenWrt 2020**. Совместимость зависит от версии LuCI; установка устаревшей темы Design блокируется.
@@ -117,10 +123,10 @@
 
 ## 📥 Загрузка и установка
 
-В [релизе **v2.5.19**](https://github.com/RichkovGit/OpenWrtStudio/releases/tag/v2.5.19) используются автономные сборки для Windows 10/11 x64:
+В [релизе **v2.5.22**](https://github.com/RichkovGit/OpenWrtStudio/releases/tag/v2.5.22) используются автономные сборки для Windows 10/11 x64:
 
-- **`OpenWrtStudio_Setup_v2.5.19.exe`** — установка для текущего пользователя в `%LOCALAPPDATA%\Programs\OpenWrt Studio`. Установщик предлагает ярлык рабочего стола и автозапуск в трее; оба пункта включаются по желанию.
-- **`OpenWrtStudio_v2.5.19_Portable.zip`** — распаковка в выбранную папку и запуск `OpenWrtStudio.exe`.
+- **`OpenWrtStudio_Setup_v2.5.22.exe`** — установка для текущего пользователя в `%LOCALAPPDATA%\Programs\OpenWrt Studio`. Установщик предлагает ярлык рабочего стола и автозапуск в трее; оба пункта включаются по желанию.
+- **`OpenWrtStudio_v2.5.22_Portable.zip`** — распаковка в выбранную папку и запуск `OpenWrtStudio.exe`.
 
 Скачайте нужный файл и `SHA256SUMS.txt` из одного релиза, проверьте SHA-256 и завершите прежнюю копию приложения через меню трея «Выход» перед заменой. Закрытие окна крестиком оставляет приложение работающим в трее.
 
@@ -133,8 +139,8 @@
 Контрольные суммы относятся к конкретному файлу и опубликованы в `SHA256SUMS.txt` рядом с файлами выпуска. Получить SHA-256 в PowerShell:
 
 ```powershell
-Get-FileHash -LiteralPath .\OpenWrtStudio_v2.5.19_Portable.zip -Algorithm SHA256
-Get-FileHash -LiteralPath .\OpenWrtStudio_Setup_v2.5.19.exe -Algorithm SHA256
+Get-FileHash -LiteralPath .\OpenWrtStudio_v2.5.22_Portable.zip -Algorithm SHA256
+Get-FileHash -LiteralPath .\OpenWrtStudio_Setup_v2.5.22.exe -Algorithm SHA256
 ```
 
 Сравните поле `Hash` со строкой соответствующего файла в `SHA256SUMS.txt`.
@@ -168,7 +174,7 @@ Get-FileHash -LiteralPath .\OpenWrtStudio_Setup_v2.5.19.exe -Algorithm SHA256
 
 4. **Создание Portable ZIP**:
    ```powershell
-   Compress-Archive -Path ./publish/* -DestinationPath ./OpenWrtStudio_v2.5.19_Portable.zip
+   Compress-Archive -Path ./publish/* -DestinationPath ./OpenWrtStudio_v2.5.22_Portable.zip
    ```
 
 Команды выполняются из корня репозитория: `OpenWrtStudio.csproj` расположен в корне, проект тестов — в `OpenWrtStudio.Tests`.
@@ -177,9 +183,9 @@ Get-FileHash -LiteralPath .\OpenWrtStudio_Setup_v2.5.19.exe -Algorithm SHA256
    ```powershell
    ./scripts/build-installer.ps1
    ```
-   Скрипт проверяет версию EXE, добавляет значок, лицензию и заметки о выпуске из репозитория и создаёт `installer_output/OpenWrtStudio_Setup_v2.5.19.exe`. Если компилятор находится вне стандартных папок, задайте `-CompilerPath 'C:\путь\ISCC.exe'`. Параметры `-PublishDirectory` и `-OutputDirectory` позволяют выбрать папки сборки. Скрипт не устанавливает инструменты автоматически. Источник установщика — [installer/setup.iss](installer/setup.iss).
+   Скрипт проверяет версию EXE, добавляет значок, лицензию и заметки о выпуске из репозитория и создаёт `installer_output/OpenWrtStudio_Setup_v2.5.22.exe`. Если компилятор находится вне стандартных папок, задайте `-CompilerPath 'C:\путь\ISCC.exe'`. Параметры `-PublishDirectory` и `-OutputDirectory` позволяют выбрать папки сборки. Скрипт не устанавливает инструменты автоматически. Источник установщика — [installer/setup.iss](installer/setup.iss).
 
-Для v2.5.19 прошли **124 теста без подключения к роутеру**, ещё 5 интеграционных проверок в обычном запуске отключены. Отдельно прошли **2 проверки чтения реального роутера**. Это проверка выбранных сценариев, а не всех сочетаний прошивок и оборудования.
+Для v2.5.22 прошли **179 офлайн-тестов** OpenWrtStudio.Tests и **10 тестов** OpenWrtStudio.Core.Tests; интеграционные проверки роутера и GitHub остаются opt-in и в обычном запуске отключены. Это проверка выбранных сценариев, а не всех сочетаний прошивок и оборудования.
 
 Workflow [Desktop build and tests](.github/workflows/desktop.yml) запускает тесты на `windows-latest` с .NET 8 и сохраняет Portable ZIP, установщик, SHA-256 и результаты тестов как артефакты Actions. Сборка установщика требует установленного Inno Setup 6 на runner. Данные доступа к роутеру и включение live-проверок для CI не нужны.
 

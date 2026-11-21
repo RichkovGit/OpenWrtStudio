@@ -1,3 +1,39 @@
+# OpenWrt Studio v2.5.22
+
+## Новые протоколы
+
+- **Shadowsocks/SS-2022** (standalone, ядро `shadowsocks-rust-sslocal`): JSON-конфиг sslocal с SOCKS/HTTP locals и шифрами SS-2022 → `/etc/shadowsocks-rust/config.json`.
+- **Hysteria 2** (standalone, пакет `hysteria`): YAML-конфиг (server/auth/TLS/bandwidth/socks5/http) → `/etc/hysteria/config.yaml`.
+- **TUIC v5** (standalone, `tuic-client`): JSON строго по схеме upstream (`deny_unknown_fields`: relay/local/log_level) → `/etc/tuic/config.json`; TUIC-outbound добавлен и в конфигуратор sing-box.
+- Для всех трёх: карта возможностей (детекция по пакетам/бинарникам/init/процессам), install-команды, procd-init при binary-only пакете, честная проверка запуска (pidof), UI-вкладки с валидацией до любых SSH-вызовов и кнопкой «Проверить статус».
+
+## «Исправить всё» одним кликом
+
+- `SentinelService.FixAllAsync`: последовательный запуск всех методов восстановления, повторная проверка здоровья после каждого шага, ранняя остановка при выздоровлении, reboot строго последний, отмена, защита от повторного запуска, отчёт (шаги/Resolved/Cancelled/Summary).
+- UI-карточка «Sentinel — исправление одним кликом» в диагностике: кнопки проверки/исправления/отмены, прогресс, отчёт; кнопка «Копировать отчёт» (аудит + FixAll).
+
+## Исправленные баги
+
+- USB/модем: пароль/APN с `=` больше не обрезается; новая Samba-секция получает корректный префикс `samba4.` (последующие `uci set` больше не падают).
+- Подписки ForkOP: URL с `=` в query не обрезается; обновление не сообщает «успех» при ненулевом exit-коде.
+- AmneziaWG: поиск peer по интерфейсу `awg0` больше не матчит чужой `awg01` (якорь вместо префикса).
+- sing-box: outbound shadowsocks/trojan генерируется с password/method; inbound `mixed` учитывается; провал рестарта службы больше не игнорируется.
+- Клиенты: кэш устройств не «протекает» между роутерами; Kick/Block/StaticLease не сообщают успех при провале; имена static-lease с апострофом декодируются корректно (`ShellHelper.DecodeUciValue`); валидация MAC/IP при добавлении аренды.
+- Пакеты: кэш apk/opkg сбрасывается при смене роутера.
+- Мониторинг: Stop→Start не запускает второй цикл опроса параллельно; probe Sentinel (watchdog/монитор/FixAll) не наслаивается на один SSH-канал; `IssueChanged` без блокирующего `Dispatcher.Invoke` (риск deadlock).
+- Утечки: `SshCommand`/`HttpResponseMessage` диспозятся; GDI-иконка трея не течёт при повторной инициализации; SSH и монитор освобождаются при выходе; CTS ping/traceroute в диагностике без гонок.
+- Проброс портов: валидация портов/IP/протокола перед сохранением.
+- Импорт `.ovpn` обёрнут в try/catch; таймер старого алерта не скрывает новый.
+- Сборка: полные копии проекта в `work/` исключены из компиляции (ломали локальную сборку корневого csproj).
+
+## Проверка
+
+- `dotnet build -c Release`: 0 ошибок, 0 предупреждений.
+- **179 офлайн-тестов** OpenWrtStudio.Tests (+51 новый) и **10 тестов** OpenWrtStudio.Core.Tests; live-проверки роутера/GitHub остаются opt-in.
+- Работа новых протоколов на реальном оборудовании пока не подтверждена: схемы конфигов сверены с ImmortalWrt-фидом и upstream-исходниками, сценарии проверены тестами.
+
+---
+
 # OpenWrt Studio v2.5.21
 
 - В разделе «О программе» добавлена кнопка темы OpenWrt Studio на 4PDA: https://4pda.to/forum/index.php?showtopic=1128057.
