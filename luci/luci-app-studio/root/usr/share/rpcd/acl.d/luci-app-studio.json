@@ -1,0 +1,42 @@
+{
+  "luci-app-studio": {
+    "description": "OpenWrt Studio: monitor and manage supported services",
+    "read": {
+      "ubus": {
+        "system": [
+          "board",
+          "info"
+        ],
+        "network.interface": [
+          "dump"
+        ],
+        "luci-rpc": [
+          "getDHCPLeases",
+          "getHostHints"
+        ],
+        "studio": [
+          "status",
+          "probe"
+        ]
+      },
+      "uci": [
+        "network",
+        "studio"
+      ]
+    },
+    "write": {
+      "ubus": {
+        "studio": [
+          "action",
+          "mihomo",
+          "vpnconfig",
+          "mesh"
+        ]
+      },
+      "uci": [
+        "network",
+        "studio"
+      ]
+    }
+  }
+}

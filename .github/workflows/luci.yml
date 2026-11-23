@@ -1,0 +1,42 @@
+name: LuCI Studio
+on:
+  push:
+    paths: ['luci/**', '.github/workflows/luci.yml']
+  pull_request:
+    paths: ['luci/**', '.github/workflows/luci.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-and-package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser test dependencies
+        run: |
+          python -m pip install playwright==1.55.0
+          python -m playwright install --with-deps chromium
+      - name: Check syntax and package metadata
+        run: |
+          for file in $(find luci -name '*.js'); do node --check "$file"; done
+          for file in $(find luci -type f -path '*/root/*' ! -name '*.json' ! -path '*/etc/config/*'); do sh -n "$file"; done
+          python -c 'import json,pathlib; [json.loads(p.read_text()) for p in pathlib.Path("luci").rglob("*.json")]'
+      - name: Check backend, watchdog and browser contracts
+        run: |
+          python luci/tests/backend.py
+          python luci/tests/sentinel.py
+          python luci/tests/theme_restore.py
+          python luci/tests/browser.py
+      - name: Build candidate IPK and source archive
+        run: python luci/scripts/build.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpenWrtStudio-LuCI-v1.0.0-rc1
+          path: |
+            luci/dist/*
+            luci/artifacts/*.png
+            luci/README.md
+            luci/RELEASE_NOTES.md

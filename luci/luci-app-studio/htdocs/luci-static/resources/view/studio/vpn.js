@@ -1,0 +1,468 @@
+"use strict";
+"require view";
+"require uci";
+"require ui";
+"require rpc";
+"require validation";
+function parseWireGuard(text, name, protocol) {
+  if (!/^[a-zA-Z][a-zA-Z0-9_]{0,14}$/.test(name))
+    throw new Error("Имя интерфейса: до 15 латинских букв, цифр и _.");
+  if (protocol !== "wireguard" && protocol !== "amneziawg")
+    throw new Error("Неизвестный протокол");
+  var iface = {},
+    peers = [],
+    section = null;
+  text.split(/\r?\n/).forEach(function (line) {
+    line = line.trim();
+    if (!line || /^[#;]/.test(line)) return;
+    if (line === "[Interface]") {
+      if (section) throw new Error("Повторный Interface");
+      section = iface;
+      return;
+    }
+    if (line === "[Peer]") {
+      section = {};
+      peers.push(section);
+      return;
+    }
+    var m = line.match(/^([A-Za-z0-9]+)\s*=\s*(.*?)\s*$/);
+    if (!m || !section) throw new Error("Неизвестная строка конфигурации");
+    if (Object.prototype.hasOwnProperty.call(section, m[1]))
+      throw new Error("Повторный параметр " + m[1]);
+    section[m[1]] = m[2];
+  });
+  function key(s) {
+    return /^[A-Za-z0-9+/]{43}=$/.test(s || "");
+  }
+  function list(value, cidr) {
+    return (value || "")
+      .split(",")
+      .map(function (x) {
+        return x.trim();
+      })
+      .filter(Boolean)
+      .map(function (x) {
+        var a = x.split("/"),
+          v4 = validation.parseIPv4(a[0]),
+          v6 = validation.parseIPv6(a[0]);
+        if (
+          (!v4 && !v6) ||
+          (cidr &&
+            (a.length !== 2 ||
+              !/^\d+$/.test(a[1]) ||
+              +a[1] > (v4 ? 32 : 128))) ||
+          (!cidr && a.length !== 1)
+        )
+          throw new Error("Неверный адрес: " + x);
+        return x;
+      });
+  }
+  if (!key(iface.PrivateKey) || !peers.length)
+    throw new Error("Нужны PrivateKey и хотя бы один Peer");
+  var values = {
+    proto: protocol,
+    private_key: iface.PrivateKey,
+    addresses: list(iface.Address, true),
+  };
+  if (!values.addresses.length) throw new Error("Не задан Address");
+  if (iface.DNS) values.dns = list(iface.DNS, false);
+  Object.keys(iface).forEach(function (k) {
+    if (
+      [
+        "PrivateKey",
+        "Address",
+        "DNS",
+        "ListenPort",
+        "MTU",
+        "Jc",
+        "Jmin",
+        "Jmax",
+        "S1",
+        "S2",
+        "H1",
+        "H2",
+        "H3",
+        "H4",
+      ].indexOf(k) < 0
+    )
+      throw new Error("Не поддерживается параметр Interface: " + k);
+  });
+  [
+    ["ListenPort", "listen_port", 1, 65535],
+    ["MTU", "mtu", 576, 9000],
+    ["Jc", "jc", 0, 65535],
+    ["Jmin", "jmin", 0, 65535],
+    ["Jmax", "jmax", 0, 65535],
+    ["S1", "s1", 0, 65535],
+    ["S2", "s2", 0, 65535],
+    ["H1", "h1", 0, 4294967295],
+    ["H2", "h2", 0, 4294967295],
+    ["H3", "h3", 0, 4294967295],
+    ["H4", "h4", 0, 4294967295],
+  ].forEach(function (f) {
+    if (iface[f[0]] != null) {
+      var n = iface[f[0]];
+      if (!/^\d+$/.test(n) || +n < f[2] || +n > f[3])
+        throw new Error("Неверный " + f[0]);
+      if (protocol === "wireguard" && /^[JSH]/.test(f[0]))
+        throw new Error("Для параметров обфускации выберите AmneziaWG");
+      values[f[1]] = n;
+    }
+  });
+  var peerValues = peers.map(function (p) {
+    if (!key(p.PublicKey) || (p.PresharedKey && !key(p.PresharedKey)))
+      throw new Error("Неверный ключ Peer");
+    Object.keys(p).forEach(function (k) {
+      if (
+        [
+          "PublicKey",
+          "PresharedKey",
+          "AllowedIPs",
+          "Endpoint",
+          "PersistentKeepalive",
+        ].indexOf(k) < 0
+      )
+        throw new Error("Не поддерживается параметр Peer: " + k);
+    });
+    var v = {
+      public_key: p.PublicKey,
+      allowed_ips: list(p.AllowedIPs, true),
+      route_allowed_ips: "1",
+    };
+    if (!v.allowed_ips.length) throw new Error("Не задан AllowedIPs");
+    if (p.PresharedKey) v.preshared_key = p.PresharedKey;
+    if (p.Endpoint) {
+      var m = p.Endpoint.match(
+        /^(?:\[([0-9a-fA-F:]+)\]|([A-Za-z0-9.-]+)):(\d+)$/,
+      );
+      if (
+        !m ||
+        +m[3] < 1 ||
+        +m[3] > 65535 ||
+        (m[1] && !validation.parseIPv6(m[1]))
+      )
+        throw new Error("Неверный Endpoint");
+      v.endpoint_host = m[1] || m[2];
+      v.endpoint_port = m[3];
+    }
+    if (p.PersistentKeepalive != null) {
+      if (
+        !/^\d+$/.test(p.PersistentKeepalive) ||
+        +p.PersistentKeepalive > 65535
+      )
+        throw new Error("Неверный PersistentKeepalive");
+      v.persistent_keepalive = p.PersistentKeepalive;
+    }
+    return v;
+  });
+  return { name: name, values: values, peers: peerValues, protocol: protocol };
+}
+var saveConfig = rpc.declare({
+  object: "studio",
+  method: "vpnconfig",
+  params: ["kind", "content"],
+  expect: {},
+});
+function singbox(fields) {
+  var port = +fields.port;
+  if (
+    !/^[A-Za-z0-9.:-]+$/.test(fields.server) ||
+    port < 1 ||
+    port > 65535 ||
+    !Number.isInteger(port)
+  )
+    throw new Error("Проверьте сервер и порт");
+  var outbound = {
+    type: fields.protocol,
+    tag: "proxy",
+    server: fields.server,
+    server_port: port,
+    tls: { enabled: true, server_name: fields.sni },
+  };
+  if (fields.protocol === "vless") {
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        fields.uuid,
+      )
+    )
+      throw new Error("Нужен UUID");
+    outbound.uuid = fields.uuid;
+    outbound.flow = "xtls-rprx-vision";
+    outbound.tls.utls = { enabled: true, fingerprint: "chrome" };
+    outbound.tls.reality = {
+      enabled: true,
+      public_key: fields.publickey,
+      short_id: fields.shortid,
+    };
+    if (
+      !/^[A-Za-z0-9_-]{43}$/.test(fields.publickey) ||
+      !/^([0-9a-f]{2}){0,8}$/i.test(fields.shortid)
+    )
+      throw new Error("Проверьте Reality public key / short ID");
+  } else if (fields.protocol === "hysteria2") {
+    if (!fields.password) throw new Error("Нужен пароль");
+    outbound.password = fields.password;
+  } else if (fields.protocol === "tuic") {
+    if (
+      !fields.password ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        fields.uuid,
+      )
+    )
+      throw new Error("Нужны UUID и пароль");
+    outbound.uuid = fields.uuid;
+    outbound.password = fields.password;
+    outbound.congestion_control = "bbr";
+  } else throw new Error("Неизвестный протокол");
+  return {
+    log: { level: "info" },
+    inbounds: [
+      {
+        type: "tun",
+        tag: "tun-in",
+        interface_name: "studio-tun",
+        address: ["172.19.0.1/30"],
+        auto_route: true,
+        strict_route: true,
+      },
+    ],
+    outbounds: [outbound, { type: "direct", tag: "direct" }],
+    route: {
+      auto_detect_interface: true,
+      rules: [{ ip_is_private: true, outbound: "direct" }],
+      final: "proxy",
+    },
+  };
+}
+return view.extend({
+  parseWireGuard: parseWireGuard,
+  buildSingbox: singbox,
+  load: function () {
+    return uci.load("network");
+  },
+  render: function () {
+    var name = E("input", { value: "awg0" }),
+      protocol = E("select", {}, [
+        E("option", { value: "amneziawg" }, "AmneziaWG"),
+        E("option", { value: "wireguard" }, "WireGuard"),
+      ]),
+      text = E("textarea", {
+        class: "studio-editor",
+        placeholder:
+          "[Interface]\nPrivateKey = …\nAddress = …\n[Peer]\nPublicKey = …\nAllowedIPs = …",
+      }),
+      output = E("pre");
+    var file = E("input", { type: "file", accept: ".conf" });
+    file.addEventListener("change", function () {
+      if (file.files[0])
+        file.files[0].text().then(function (t) {
+          text.value = t;
+        });
+    });
+    function stage() {
+      var c;
+      try {
+        c = parseWireGuard(text.value, name.value, protocol.value);
+        if (uci.get("network", c.name))
+          throw new Error("Интерфейс уже существует. Выберите другое имя.");
+      } catch (e) {
+        output.textContent = e.message;
+        return;
+      }
+      ui.showModal("Добавить интерфейс?", [
+        E(
+          "p",
+          {},
+          "Будет добавлен " +
+            c.name +
+            " и " +
+            c.peers.length +
+            " peer. Импорт создаёт отложенные изменения UCI. Проверьте протокол, зону брандмауэра и маршруты в форме интерфейсов, затем примените изменения с откатом LuCI.",
+        ),
+        E("button", { class: "cbi-button", click: ui.hideModal }, "Отмена"),
+        E(
+          "button",
+          {
+            class: "cbi-button cbi-button-positive",
+            click: function () {
+              ui.hideModal();
+              uci.add("network", "interface", c.name);
+              Object.keys(c.values).forEach(function (k) {
+                uci.set("network", c.name, k, c.values[k]);
+              });
+              c.peers.forEach(function (p) {
+                var sid = uci.add("network", c.protocol + "_" + c.name);
+                Object.keys(p).forEach(function (k) {
+                  uci.set("network", sid, k, p[k]);
+                });
+              });
+              return uci
+                .save()
+                .then(function () {
+                  location.href = L.url("admin/network/network");
+                })
+                .catch(function (e) {
+                  output.textContent = e.message;
+                });
+            },
+          },
+          "Добавить отложенные изменения",
+        ),
+      ]);
+    }
+    var inputs = {};
+    function field(key, label, type, value) {
+      var input = E("input", {
+        type: type || "text",
+        value: value || "",
+        autocomplete: "off",
+      });
+      inputs[key] = input;
+      return E("div", { class: "cbi-value" }, [
+        E("label", { class: "cbi-value-title" }, label),
+        E("div", { class: "cbi-value-field" }, [input]),
+      ]);
+    }
+    var proxyProtocol = E(
+      "select",
+      {},
+      ["vless", "hysteria2", "tuic"].map(function (x) {
+        return E("option", { value: x }, x);
+      }),
+    );
+    var editor = E("textarea", { class: "studio-editor", spellcheck: "false" }),
+      result = E("pre");
+    function apply(kind, content) {
+      ui.showModal("Применить " + kind + "?", [
+        E(
+          "p",
+          {},
+          "Sing-box проверяется ядром; профиль OpenVPN проверяется по списку допустимых клиентских директив. Файл сохраняется с резервной копией, затем служба перезапускается. Изменение маршрутов может прервать доступ к роутеру. Для OpenVPN допускается только клиентский профиль с встроенными сертификатами без сценариев и внешних файлов.",
+        ),
+        E("button", { class: "cbi-button", click: ui.hideModal }, "Отмена"),
+        E(
+          "button",
+          {
+            class: "cbi-button cbi-button-positive",
+            click: function () {
+              ui.hideModal();
+              return saveConfig(kind, content)
+                .then(function (r) {
+                  result.textContent =
+                    (r.ok ? "Готово: " : "Ошибка: ") +
+                    (r.error || r.output || "");
+                })
+                .catch(function (e) {
+                  result.textContent = e.message;
+                });
+            },
+          },
+          "Проверить и применить",
+        ),
+      ]);
+    }
+    var ovpn = E("textarea", {
+        class: "studio-editor",
+        placeholder: "client\nremote …\n<ca>…</ca>\n…",
+      }),
+      ovpnFile = E("input", { type: "file", accept: ".ovpn" });
+    ovpnFile.addEventListener("change", function () {
+      if (ovpnFile.files[0])
+        ovpnFile.files[0].text().then(function (t) {
+          ovpn.value = t;
+        });
+    });
+    return E("div", {}, [
+      E("h2", {}, "Импорт и конструкторы VPN"),
+      E("div", { class: "studio-card" }, [
+        E("h3", {}, "WireGuard / AmneziaWG · импорт .conf"),
+        E(
+          "p",
+          {},
+          "Нужен установленный модуль протокола. Поддерживаются IPv4/IPv6 endpoint, несколько peer, DNS и параметры Jc/Jmin/Jmax/S1/S2/H1–H4. Неподдерживаемые параметры отклоняются.",
+        ),
+        name,
+        protocol,
+        file,
+        text,
+        E(
+          "button",
+          {
+            class: "cbi-button cbi-button-positive",
+            disabled: !L.hasViewPermission(),
+            click: stage,
+          },
+          "Импортировать в UCI",
+        ),
+        output,
+      ]),
+      E("div", { class: "studio-card" }, [
+        E("h3", {}, "Sing-box · VLESS Reality / Hysteria 2 / TUIC"),
+        proxyProtocol,
+        field("server", "Сервер"),
+        field("port", "Порт", "number", "443"),
+        field("sni", "TLS Server Name"),
+        field("uuid", "UUID"),
+        field("password", "Пароль", "password"),
+        field("publickey", "Reality public key"),
+        field("shortid", "Reality short ID"),
+        E(
+          "button",
+          {
+            class: "cbi-button",
+            click: function () {
+              try {
+                var values = { protocol: proxyProtocol.value };
+                Object.keys(inputs).forEach(function (k) {
+                  values[k] =
+                    k === "password" ? inputs[k].value : inputs[k].value.trim();
+                });
+                editor.value = JSON.stringify(singbox(values), null, 2);
+              } catch (e) {
+                result.textContent = e.message;
+              }
+            },
+          },
+          "Сформировать Sing-box",
+        ),
+        editor,
+        E(
+          "button",
+          {
+            class: "cbi-button cbi-button-positive",
+            disabled: !L.hasViewPermission(),
+            click: function () {
+              try {
+                JSON.parse(editor.value);
+                apply("sing-box", editor.value);
+              } catch (e) {
+                result.textContent = e.message;
+              }
+            },
+          },
+          "Проверить и применить Sing-box",
+        ),
+      ]),
+      E("div", { class: "studio-card" }, [
+        E("h3", {}, "OpenVPN · импорт .ovpn"),
+        ovpnFile,
+        ovpn,
+        E(
+          "button",
+          {
+            class: "cbi-button cbi-button-positive",
+            disabled: !L.hasViewPermission(),
+            click: function () {
+              apply("openvpn", ovpn.value);
+            },
+          },
+          "Импортировать и запустить OpenVPN",
+        ),
+        result,
+      ]),
+    ]);
+  },
+  handleSaveApply: null,
+  handleSave: null,
+  handleReset: null,
+});

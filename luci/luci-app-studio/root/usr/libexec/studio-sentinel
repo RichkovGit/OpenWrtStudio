@@ -1,0 +1,38 @@
+#!/bin/sh
+# Opt-in recovery. Never restarts the entire network or changes routes/DNS settings.
+. /lib/functions.sh
+config_load studio
+config_get interval sentinel interval 60
+config_get failures sentinel failures 3
+config_get cooldown sentinel cooldown 300
+config_get_bool dns sentinel dns 1
+config_get proxy sentinel proxy none
+case "$interval" in ''|*[!0-9]*) interval=60;; esac
+case "$failures" in ''|*[!0-9]*) failures=3;; esac
+case "$cooldown" in ''|*[!0-9]*) cooldown=300;; esac
+[ "$interval" -ge 30 ] && [ "$interval" -le 3600 ] || interval=60
+[ "$failures" -ge 2 ] && [ "$failures" -le 20 ] || failures=3
+[ "$cooldown" -ge 300 ] && [ "$cooldown" -le 86400 ] || cooldown=300
+case "$proxy" in mihomo|sing-box|none) ;; *) proxy=none;; esac
+count=0; previous=''; last=0
+while :; do
+ issue=healthy; recovery=''
+ if ping -c 1 -W 2 1.1.1.1 >/dev/null 2>&1 || ping -c 1 -W 2 77.88.8.8 >/dev/null 2>&1; then
+  if ! nslookup openwrt.org 127.0.0.1 >/dev/null 2>&1; then issue=local_dns; [ "$dns" = 1 ] && recovery=dnsmasq; fi
+ else
+  wan="$(ubus call network.interface.wan status 2>/dev/null | jsonfilter -e '@.up')"
+  if [ "$wan" != true ]; then issue=wan_down; else issue=upstream_or_tunnel; fi
+  if [ "$proxy" != none ] && [ -x "/etc/init.d/$proxy" ] && ! /etc/init.d/"$proxy" running >/dev/null 2>&1; then issue=proxy_stopped; recovery="$proxy"; fi
+ fi
+ if [ "$issue" = "$previous" ]; then count=$((count + 1)); else
+  logger -t studio-sentinel "Health state: $issue"
+  count=1; previous="$issue"
+ fi
+ now="$(date +%s)"
+ if [ -n "$recovery" ] && [ "$count" -ge "$failures" ] && [ $((now - last)) -ge "$cooldown" ]; then
+  logger -t studio-sentinel "Recovery: restarting $recovery after $count failed checks"
+  if /etc/init.d/"$recovery" restart; then logger -t studio-sentinel 'Restart command succeeded'; else logger -t studio-sentinel 'Restart command failed'; fi
+  last="$now"; count=0
+ fi
+ sleep "$interval"
+done

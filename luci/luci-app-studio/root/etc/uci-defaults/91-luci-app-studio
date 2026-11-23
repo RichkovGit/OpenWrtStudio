@@ -1,0 +1,4 @@
+#!/bin/sh
+/etc/init.d/studio-sentinel enable
+/etc/init.d/studio-sentinel start
+exit 0
